@@ -63,3 +63,31 @@ class OwnPinIn(BaseModel):
 class MePatch(BaseModel):
     language: Literal["de", "en"] | None = None
     color: str | None = Field(default=None, pattern=COLOR)
+
+
+# https only; http only for a development server on this machine
+URL = r"^(https://[^\s/]+(/\S*)?|http://(localhost|127\.0\.0\.1)(:\d+)?(/\S*)?)$"
+
+
+class TileIn(BaseModel):
+    name: str = Field(min_length=1, max_length=50)
+    icon: str = Field(default="", max_length=16)
+    local_url: str = Field(max_length=300, pattern=URL)
+    # None: the app is reachable at home only
+    remote_url: str | None = Field(default=None, max_length=300, pattern=URL)
+
+
+class TilePatch(BaseModel):
+    name: str | None = Field(default=None, min_length=1, max_length=50)
+    icon: str | None = Field(default=None, max_length=16)
+    local_url: str | None = Field(default=None, max_length=300, pattern=URL)
+    remote_url: str | None = Field(default=None, max_length=300, pattern=URL)
+
+
+class TileOut(BaseModel):
+    id: int
+    name: str
+    icon: str
+    local_url: str
+    remote_url: str | None
+    position: int

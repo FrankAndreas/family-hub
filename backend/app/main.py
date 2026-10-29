@@ -2,7 +2,7 @@ import logging
 
 from fastapi import FastAPI
 
-from . import database, database_setup, people_api, session_api
+from . import database, database_setup, people_api, session_api, tiles_api
 from .seed import seed_admin
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
@@ -20,6 +20,7 @@ if _initial_pin:
 app = FastAPI(title="family-hub API", version="0.1.0")
 app.include_router(people_api.router, prefix="/api")
 app.include_router(session_api.router)
+app.include_router(tiles_api.router, prefix="/api")
 
 
 @app.get("/health")
