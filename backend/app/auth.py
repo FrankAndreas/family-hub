@@ -52,7 +52,8 @@ def name_key(name: str) -> str:
 
 def lock_duration(lockouts: int) -> timedelta:
     """15, 30, 60, ... minutes for the first, second, third lock in a row; at most a day."""
-    return min(LOCK_DURATION * 2 ** min(max(lockouts - 1, 0), 10), MAX_LOCK_DURATION)
+    duration: timedelta = LOCK_DURATION * 2 ** min(max(lockouts - 1, 0), 10)
+    return min(duration, MAX_LOCK_DURATION)
 
 
 def through_tunnel(request: Request) -> bool:

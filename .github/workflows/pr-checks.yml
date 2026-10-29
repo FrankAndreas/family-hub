@@ -14,7 +14,10 @@ jobs:
         with:
           python-version: '3.14'
           cache: 'pip'
-      - run: pip install -r backend/requirements.txt -r tests/requirements.txt
+      - run: pip install -r backend/requirements.txt -r tests/requirements.txt black flake8 mypy
+      - run: black --check backend tests
+      - run: flake8 backend tests --max-line-length=120 --extend-ignore=E203,W503
+      - run: cd backend && mypy app --ignore-missing-imports
       # The tests run the API in-process against a temporary SQLite database (see tests/conftest.py)
       - run: pytest
 

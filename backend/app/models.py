@@ -1,6 +1,8 @@
 import enum
+from datetime import datetime
 
-from sqlalchemy import Boolean, Column, DateTime, Enum, Integer, String
+from sqlalchemy import Enum, String
+from sqlalchemy.orm import Mapped, mapped_column
 
 from .database import Base
 from .timeutil import utcnow
@@ -18,27 +20,27 @@ class Person(Base):
     # Never reuse ids: login tokens and the apps' own rows name the person by id
     __table_args__ = {"sqlite_autoincrement": True}
 
-    id = Column(Integer, primary_key=True)
-    name = Column(String(50), nullable=False)
+    id: Mapped[int] = mapped_column(primary_key=True)
+    name: Mapped[str] = mapped_column(String(50))
     # name.casefold(): names are unique and logins match regardless of case ("lena" is "Lena")
-    name_key = Column(String(50), unique=True, nullable=False)
+    name_key: Mapped[str] = mapped_column(String(50), unique=True)
     # How Cloudflare Access knows the person outside; stored casefolded, unique
-    email = Column(String(254), unique=True)
-    pin_hash = Column(String, nullable=False)
-    role = Column(Enum(Role), default=Role.CHILD, nullable=False)
+    email: Mapped[str | None] = mapped_column(String(254), unique=True)
+    pin_hash: Mapped[str] = mapped_column(String)
+    role: Mapped[Role] = mapped_column(Enum(Role), default=Role.CHILD)
     # An inactive person can't log in, and the apps hear their logins are no longer valid
-    active = Column(Boolean, default=True, nullable=False)
+    active: Mapped[bool] = mapped_column(default=True)
     # The person's colour on the login screen and in the apps, e.g. "#f59e0b"
-    color = Column(String(7))
+    color: Mapped[str | None] = mapped_column(String(7))
     # None: the default language (DEFAULT_LANGUAGE)
-    language = Column(String(2))
-    failed_logins = Column(Integer, default=0, nullable=False)
-    locked_until = Column(DateTime)
+    language: Mapped[str | None] = mapped_column(String(2))
+    failed_logins: Mapped[int] = mapped_column(default=0)
+    locked_until: Mapped[datetime | None]
     # Locks in a row: each one doubles the next (see auth.lock_duration); a correct login or a new PIN resets it
-    lockouts = Column(Integer, default=0, nullable=False)
+    lockouts: Mapped[int] = mapped_column(default=0)
     # Part of every login token; raising it ends all of the person's logins (new PIN, log out everywhere)
-    token_version = Column(Integer, default=0, nullable=False)
-    created_at = Column(DateTime, default=utcnow, nullable=False)
+    token_version: Mapped[int] = mapped_column(default=0)
+    created_at: Mapped[datetime] = mapped_column(default=utcnow)
 
 
 class Tile(Base):
@@ -46,10 +48,10 @@ class Tile(Base):
 
     __tablename__ = "tiles"
 
-    id = Column(Integer, primary_key=True)
-    name = Column(String(50), nullable=False)
+    id: Mapped[int] = mapped_column(primary_key=True)
+    name: Mapped[str] = mapped_column(String(50))
     # An emoji, e.g. "💰"
-    icon = Column(String(16), nullable=False, default="")
-    local_url = Column(String(300), nullable=False)
-    remote_url = Column(String(300))
-    position = Column(Integer, nullable=False, default=0)
+    icon: Mapped[str] = mapped_column(String(16), default="")
+    local_url: Mapped[str] = mapped_column(String(300))
+    remote_url: Mapped[str | None] = mapped_column(String(300))
+    position: Mapped[int] = mapped_column(default=0)
