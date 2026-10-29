@@ -2,7 +2,7 @@ import logging
 
 from fastapi import FastAPI
 
-from . import database, database_setup, people_api, session_api, tiles_api
+from . import database, database_setup, keys, people_api, session_api, tiles_api
 from .seed import seed_admin
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
@@ -10,6 +10,9 @@ logger = logging.getLogger(__name__)
 
 # Create or upgrade the schema (Alembic migrations in app/migrations)
 database_setup.setup(database.engine)
+
+# The signing key, made now if new (not by two first requests at once)
+keys.signing_key()
 
 # A fresh database gets a first parent to log in with
 with database.SessionLocal() as _db:

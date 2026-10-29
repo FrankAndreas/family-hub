@@ -19,13 +19,16 @@ Running it on the NAS: [README_DOCKER.md](README_DOCKER.md).
 
 ## For apps: using the family login
 
-An app that switches to the hub drops its own PINs and asks the hub who is logged in:
+An app that switches to the hub drops its own PINs and asks the hub who is logged in, with `GET <hub>/api/session`:
 
-- **At home** the browser sends the hub's cookie `hub_session` to the app (it is set for `local.<domain>`). The app
-  passes it on: `GET <hub>/api/session` with `Authorization: Bearer <hub_session>`.
-- **From outside** Cloudflare adds `Cf-Access-Jwt-Assertion` to every request. The app passes that header on to the
-  same `GET <hub>/api/session`. The hub checks it against Cloudflare's keys and the Access applications listed in its
-  `CF_AUDIENCE`, so the app needs no Cloudflare settings of its own.
+- **A request from outside** carries `Cf-Connecting-Ip` (Cloudflare sets it on everything through the tunnel). The app
+  passes on that header and `Cf-Access-Jwt-Assertion`, **and never a `hub_session` cookie**: one arriving from outside
+  can only be a stolen home login. The hub checks Cloudflare's token against Cloudflare's keys and the Access
+  applications in its `CF_AUDIENCE`, so the app needs no Cloudflare settings of its own; with `Cf-Connecting-Ip` it
+  ignores any hub token.
+- **A request at home** (no `Cf-Connecting-Ip`) carries the hub's cookie `hub_session` (set for `local.<domain>`). The
+  app passes it on as `Authorization: Bearer <hub_session>`.
+- Neither header nor cookie belongs in an app's logs: each is a login to the hub, a parent's with full rights.
 
 The answer is `{"valid": true, "person": {"id", "name", "email", "role", "color", "language"}}` or
 `{"valid": false, "person": null}`. Cache it for a minute or so. Logging out everywhere, a new PIN and deactivating a

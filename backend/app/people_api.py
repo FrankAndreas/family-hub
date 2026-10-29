@@ -161,8 +161,8 @@ def set_own_pin(
     person: models.Person = Depends(auth.current_person),
     db: Session = Depends(get_db),
 ):
-    if not auth.verify_pin(body.old_pin, person.pin_hash):
-        raise api_error(401, "wrong_pin")
+    # Counts toward the lock like a login: a session alone doesn't let anyone try PINs
+    auth.check_pin(db, person, body.old_pin, api_error(401, "wrong_pin"))
     _new_pin(person, body.pin)
     db.commit()
     # Other devices are logged out; this one stays

@@ -109,7 +109,8 @@ upload_if_changed() {
         return 1
     fi
     confirm "Upload the changes to $name above?" || { echo "Aborted." >&2; exit 1; }
-    remote_tmp="/tmp/deploy-nas.$$.$name"
+    # A fresh private file (mktemp), not a guessable /tmp name another NAS account could prepare
+    remote_tmp=$(nas "mktemp /tmp/deploy-nas.XXXXXXXX")
     nas "cat > '$remote_tmp'" < "$local_file"
     nas_sudo "install -m $mode '$remote_tmp' '$NAS_DIR/$name'" && nas "rm -f '$remote_tmp'"
     echo "$name: uploaded"

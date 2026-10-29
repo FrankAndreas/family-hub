@@ -39,7 +39,11 @@ def session(
 ):
     """The login as an app passes it: the hub login (Bearer) at home, or the Cloudflare Access token (as Cloudflare
     sent it, Cf-Access-Jwt-Assertion) from outside; else the browser's own login."""
-    if credentials is not None:
+    if auth.through_tunnel(request):
+        # From outside only Cloudflare's token counts: a hub token there may be a stolen home cookie, which the app
+        # passed on (apps pass Cf-Connecting-Ip on with it; see README "For apps")
+        person = cloudflare.person_for(request, db)
+    elif credentials is not None:
         person = auth.person_for_token(db, credentials.credentials)
     elif cloudflare.HEADER in request.headers:
         person = cloudflare.person_for(request, db)

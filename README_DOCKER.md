@@ -26,6 +26,7 @@ It sits next to the other family apps on one NAS (budget 8081, job tracking 8082
    cd /volume1/docker/family-hub
    sudo mkdir -p data
    sudo chown -R 1031:100 data    # the IDs from step 1, or 999:999
+   sudo chmod 700 data            # the PIN hashes and the signing key: for the hub only
    ```
 3. **Create `.env`** (see `.env.example` for all settings):
    ```bash
@@ -83,8 +84,9 @@ outside address in the hub.
 
 ### Where the data is
 
-`data/` holds the database `hub.db` and `signing-key.pem`. Back up the whole folder. Without the key, every login ends
-and the apps must fetch the new public key.
+`data/` holds the database `hub.db` and `signing-key.pem`. Back up the whole folder, and keep the backup private: the
+PIN hashes in it fall to a brute force (4 digits), and the key signs logins for every app. Without the key, every
+login ends and the apps must fetch the new public key.
 
 ## Automatic updates
 

@@ -7,6 +7,7 @@ Cf-Connecting-Ip) gets no PIN login and its cookie counts for nothing: outside, 
 
 import logging
 import math
+import threading
 from datetime import datetime, timedelta, timezone
 
 import bcrypt
@@ -60,28 +61,48 @@ def through_tunnel(request: Request) -> bool:
     return TUNNEL_HEADER in request.headers
 
 
+# One PIN check per person at a time (security review 2026-10-29): parallel guesses would each read the same count of
+# wrong PINs while bcrypt runs, and get far more tries than MAX_FAILED_LOGINS. The backend is one process (uvicorn
+# without workers), so a lock in memory is enough
+_pin_locks: dict[int, threading.Lock] = {}
+_pin_locks_guard = threading.Lock()
+
+
+def _pin_lock(person_id: int) -> threading.Lock:
+    with _pin_locks_guard:
+        return _pin_locks.setdefault(person_id, threading.Lock())
+
+
+def check_pin(db: Session, person: models.Person, pin: str, wrong: Exception) -> None:
+    """The person's PIN, counting wrong ones and locking the person after too many; raises `wrong` or 429."""
+    with _pin_lock(person.id):
+        # What other requests counted meanwhile
+        db.refresh(person)
+        now = utcnow()
+        if person.locked_until and person.locked_until > now:
+            minutes = math.ceil((person.locked_until - now).total_seconds() / 60)
+            raise api_error(status.HTTP_429_TOO_MANY_REQUESTS, "locked", minutes=minutes)
+        if not verify_pin(pin, person.pin_hash):
+            person.failed_logins += 1
+            if person.failed_logins >= MAX_FAILED_LOGINS:
+                person.failed_logins = 0
+                person.lockouts += 1
+                person.locked_until = now + lock_duration(person.lockouts)
+            db.commit()
+            raise wrong
+        person.failed_logins = 0
+        person.lockouts = 0
+        person.locked_until = None
+        db.commit()
+
+
 def authenticate(db: Session, name: str, pin: str) -> models.Person:
     """The active person with this name and PIN; counts wrong PINs and locks the person after too many."""
     wrong = api_error(status.HTTP_401_UNAUTHORIZED, "wrong_name_or_pin")
     person = db.query(models.Person).filter(models.Person.name_key == name_key(name)).first()
     if person is None or not person.active:
         raise wrong
-    now = utcnow()
-    if person.locked_until and person.locked_until > now:
-        minutes = math.ceil((person.locked_until - now).total_seconds() / 60)
-        raise api_error(status.HTTP_429_TOO_MANY_REQUESTS, "locked", minutes=minutes)
-    if not verify_pin(pin, person.pin_hash):
-        person.failed_logins += 1
-        if person.failed_logins >= MAX_FAILED_LOGINS:
-            person.failed_logins = 0
-            person.lockouts += 1
-            person.locked_until = now + lock_duration(person.lockouts)
-        db.commit()
-        raise wrong
-    person.failed_logins = 0
-    person.lockouts = 0
-    person.locked_until = None
-    db.commit()
+    check_pin(db, person, pin, wrong)
     return person
 
 

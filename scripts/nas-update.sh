@@ -41,7 +41,11 @@ cd "$APP_DIR" || { echo "Cannot cd to $APP_DIR"; exit 1; }
 
 LOG_DIR="$APP_DIR/logs"
 BACKUP_DIR="$APP_DIR/db-backups"
+# Backups and logs are for root only: the backups hold the PIN hashes (4 digits fall to a brute force offline), and a
+# failed start's log lines can hold the first Admin PIN
+umask 077
 mkdir -p "$LOG_DIR" "$BACKUP_DIR"
+chmod 700 "$LOG_DIR" "$BACKUP_DIR"
 LOG_FILE="$LOG_DIR/update.log"
 
 log() { echo "$(date '+%Y-%m-%d %H:%M:%S') $*" | tee -a "$LOG_FILE"; }
