@@ -68,7 +68,7 @@ export default function TilesSettings() {
                         <input className={INPUT} value={form.icon} maxLength={16} onChange={e => setForm({ ...form, icon: e.target.value })} />
                     </label>
                     <label className="text-sm text-slate-400">{t('tiles.localUrl')}
-                        <input className={INPUT} type="url" value={form.local_url} required placeholder="https://budget.local.example.ch"
+                        <input className={INPUT} type="url" value={form.local_url} required placeholder={t('tiles.localExample')}
                             onChange={e => setForm({ ...form, local_url: e.target.value })} />
                     </label>
                     <label className="text-sm text-slate-400">{t('tiles.remoteUrl')}

@@ -25,7 +25,7 @@ def person_out(person: models.Person) -> schemas.PersonOut:
 
 @router.get("/config")
 def public_config():
-    """What the login screen needs before anyone is logged in: the language for browsers in neither German nor English."""
+    """What the login screen needs before anyone is logged in: the language for browsers that speak neither."""
     return {"default_language": config.default_language()}
 
 

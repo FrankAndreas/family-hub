@@ -51,6 +51,7 @@ const en: typeof de = {
         add: '+ Add app',
         name: 'App name',
         icon: 'Icon',
+        localExample: 'e.g. https://budget.local.<domain>',
         localUrl: 'Address at home',
         remoteUrl: 'Address outside',
         remoteEmpty: 'empty: home only',

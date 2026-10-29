@@ -49,6 +49,7 @@ const de = {
         add: '+ App hinzufügen',
         name: 'App-Name',
         icon: 'Symbol',
+        localExample: 'z. B. https://budget.local.<domain>',
         localUrl: 'Adresse zu Hause',
         remoteUrl: 'Adresse unterwegs',
         remoteEmpty: 'leer: nur zu Hause',
