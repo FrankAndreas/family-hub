@@ -23,6 +23,12 @@ def person_out(person: models.Person) -> schemas.PersonOut:
     )
 
 
+@router.get("/config")
+def public_config():
+    """What the login screen needs before anyone is logged in: the language for browsers in neither German nor English."""
+    return {"default_language": config.default_language()}
+
+
 @router.get("/people/public", response_model=list[schemas.PersonPublic], dependencies=[Depends(auth.require_home)])
 def public_people(db: Session = Depends(get_db)):
     """Names and colours for the login screen at home."""

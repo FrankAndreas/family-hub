@@ -82,3 +82,9 @@ def test_names_for_the_login_screen(client, db):
     make_person(db, "Tim", active=False)
     found = client.get("/api/people/public").json()
     assert found == [{"name": "Admin", "color": None}, {"name": "Lena", "color": "#f59e0b"}]
+
+
+def test_config_for_the_login_screen(client, monkeypatch):
+    assert client.get("/api/config").json() == {"default_language": "de"}
+    monkeypatch.setenv("DEFAULT_LANGUAGE", "en")
+    assert client.get("/api/config").json() == {"default_language": "en"}
