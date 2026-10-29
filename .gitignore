@@ -1,0 +1,15 @@
+.superpowers/
+venv/
+__pycache__/
+.pytest_cache/
+.mypy_cache/
+.coverage
+data/*
+!data/.gitkeep
+node_modules/
+dist/
+.env
+.deploy.env
+e2e/.tmp/
+e2e/test-results/
+e2e/playwright-report/
