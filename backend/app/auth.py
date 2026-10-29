@@ -14,7 +14,7 @@ import jwt
 from fastapi import Depends, Request, Response, status
 from sqlalchemy.orm import Session
 
-from . import config, database, keys, models
+from . import cloudflare, config, database, keys, models
 from .errors import api_error
 from .timeutil import utcnow
 
@@ -135,9 +135,9 @@ def clear_cookie(response: Response) -> None:
 
 
 def current_person_or_none(request: Request, db: Session) -> models.Person | None:
-    """Who is asking: outside the Cloudflare Access token (Task 4), at home the hub cookie."""
+    """Who is asking: outside the Cloudflare Access token, at home the hub cookie."""
     if through_tunnel(request):
-        return None
+        return cloudflare.person_for(request, db)
     return person_for_token(db, request.cookies.get(COOKIE))
 
 

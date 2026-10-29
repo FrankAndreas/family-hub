@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.orm import Session
 
-from . import auth, config, keys, models
+from . import auth, cloudflare, config, keys, models
 from .database import get_db
 
 router = APIRouter(tags=["session"])
@@ -37,9 +37,12 @@ def session(
     credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
     db: Session = Depends(get_db),
 ):
-    """The login as an app passes it (Bearer), or the browser's own cookie at home."""
+    """The login as an app passes it: the hub login (Bearer) at home, or the Cloudflare Access token (as Cloudflare
+    sent it, Cf-Access-Jwt-Assertion) from outside; else the browser's own login."""
     if credentials is not None:
         person = auth.person_for_token(db, credentials.credentials)
+    elif cloudflare.HEADER in request.headers:
+        person = cloudflare.person_for(request, db)
     else:
         person = auth.current_person_or_none(request, db)
     if person is None:
