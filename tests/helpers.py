@@ -18,3 +18,21 @@ def add_person(client, name, pin="5678", role="CHILD", email=None, **fields) -> 
     response = client.post("/api/people", json=body)
     assert response.status_code == 201, response.text
     return response.json()
+
+
+def make_person(db, name, pin="5678", role="CHILD", email=None, active=True, color=None):
+    """A person straight in the database (before the people API exists in a test)."""
+    from app import auth, models
+
+    person = models.Person(
+        name=name,
+        name_key=auth.name_key(name),
+        email=email.casefold() if email else None,
+        pin_hash=auth.get_pin_hash(pin),
+        role=models.Role(role),
+        active=active,
+        color=color,
+    )
+    db.add(person)
+    db.commit()
+    return person
