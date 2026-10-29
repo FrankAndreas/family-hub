@@ -41,9 +41,12 @@ export default function Settings() {
         await reload();
     };
 
+    const atHome = person?.at_home ?? true;
+
     return (
         <div className="space-y-6">
-            <section className={`${CARD} space-y-3`}>
+            {!atHome && <p className={`${CARD} text-slate-300`}>{t('settings.manageAtHome')}</p>}
+            {atHome && <section className={`${CARD} space-y-3`}>
                 <h2 className="text-lg font-semibold">{t('settings.myPin')}</h2>
                 <form onSubmit={changePin} className="grid gap-2 sm:grid-cols-3">
                     <div className="text-sm text-slate-400">
@@ -60,7 +63,7 @@ export default function Settings() {
                 </form>
                 {message && <p className="text-sm text-emerald-300">{message}</p>}
                 {error && <p className={ERROR}>{error}</p>}
-            </section>
+            </section>}
             <section className={`${CARD} flex flex-wrap items-end gap-4`}>
                 <label className="text-sm text-slate-400">{t('settings.language')}
                     <select className={INPUT} value={person?.language ?? 'de'} onChange={e => void setLanguage(e.target.value)}>
@@ -70,7 +73,7 @@ export default function Settings() {
                 </label>
                 <button type="button" className={BUTTON_DANGER} onClick={() => void logoutEverywhere()}>{t('settings.logoutEverywhere')}</button>
             </section>
-            {person?.role === 'PARENT' && (<>
+            {atHome && person?.role === 'PARENT' && (<>
                 <PeopleSettings />
                 <TilesSettings />
             </>)}

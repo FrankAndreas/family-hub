@@ -40,6 +40,9 @@ is too heavy for the NAS and a poor fit for PINs (my call, agreed in chat).
     person by e-mail address. No PIN outside.
   - Switching apps never asks again. A logout in the hub or any app logs out of all apps on that device. A login lasts
     30 days (my call; jobs and meal planner use 30 days today, budget about 2).
+- **Managing at home only** (the user's choice after the security review): people, PINs (also one's own) and the
+  apps are managed at home only. From outside one uses the apps and changes one's language and colour; a parent's
+  mailbox someone broke into gets past Cloudflare Access but can't take over the family's accounts.
 - **Apps keep their own details** per person (budget: allowance child, privacy, shares; meal planner: language, ...),
   keyed by the hub's person id.
 - **No breakage during the change**: the hub comes first, then one app at a time switches; an app not switched yet

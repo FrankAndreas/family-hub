@@ -25,6 +25,7 @@ const de = {
         changePin: 'PIN ändern',
         pinChanged: 'PIN geändert. Auf anderen Geräten bist du jetzt abgemeldet.',
         language: 'Sprache',
+        manageAtHome: 'PIN, Personen und Apps lassen sich nur zu Hause verwalten, nicht von unterwegs.',
         logoutEverywhere: 'Überall abmelden',
         confirmEverywhere: 'Auf allen Geräten und in allen Apps abmelden?',
     },

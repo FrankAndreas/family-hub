@@ -169,9 +169,18 @@ def current_person(request: Request, db: Session = Depends(database.get_db)) -> 
     return person
 
 
-def require_parent(person: models.Person = Depends(current_person)) -> models.Person:
+def require_manage_at_home(request: Request) -> None:
+    """Managing people, PINs and apps happens at home only (the user's choice, 2026-10-29): a parent's mailbox someone
+    broke into gets past Cloudflare Access, but must not take over the family's accounts."""
+    if through_tunnel(request):
+        raise api_error(status.HTTP_403_FORBIDDEN, "manage_at_home_only")
+
+
+def require_parent(request: Request, person: models.Person = Depends(current_person)) -> models.Person:
+    """A parent, at home: every parent right is about managing the family."""
     if person.role != models.Role.PARENT:
         raise api_error(status.HTTP_403_FORBIDDEN, "parents_only")
+    require_manage_at_home(request)
     return person
 
 

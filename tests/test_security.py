@@ -90,3 +90,32 @@ def test_unknown_key_id_fetches_the_keys_again_once(client, db, access, monkeypa
 def test_signing_key_made_at_start():
     # Made before the first request (no race between two first requests)
     assert (config.data_dir() / keys.FILE).exists()
+
+
+def test_managing_only_at_home(client, db, access):  # noqa: F811
+    # A parent logged in through Cloudflare (a mailbox someone broke into) can't take over the family's accounts
+    from helpers import make_person
+
+    mama = make_person(db, "Mama", role="PARENT", email="mama@example.ch")
+    headers = outside(token())
+    me = client.get("/api/me", headers=headers).json()
+    assert (me["name"], me["at_home"]) == ("Mama", False)
+    refused = [
+        client.get("/api/people", headers=headers),
+        client.post("/api/people", json={"name": "Tim", "pin": "1111", "role": "CHILD"}, headers=headers),
+        client.patch(f"/api/people/{mama.id}", json={"email": "evil@example.com"}, headers=headers),
+        client.put(f"/api/people/{mama.id}/pin", json={"pin": "1111"}, headers=headers),
+        client.put("/api/me/pin", json={"old_pin": "5678", "pin": "1111"}, headers=headers),
+        client.get("/api/tiles/manage", headers=headers),
+        client.post("/api/tiles", json={"name": "X", "local_url": "https://x.example.ch"}, headers=headers),
+        client.put("/api/tiles/order", json=[], headers=headers),
+    ]
+    for response in refused:
+        assert response.status_code == 403 and response.json()["detail"] == "manage_at_home_only", response.url
+    # Using the apps and one's own settings still works outside
+    assert client.get("/api/tiles", headers=headers).status_code == 200
+    assert client.patch("/api/me", json={"language": "en"}, headers=headers).status_code == 200
+    # At home the same parent manages everything
+    login(client, "Mama", "5678")
+    assert client.get("/api/me").json()["at_home"] is True
+    assert client.get("/api/people").status_code == 200

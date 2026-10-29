@@ -11,6 +11,8 @@ same stack and look. German by default, English per person.
 - **From outside** (`*.<domain>` through the Cloudflare Tunnel): Cloudflare Access is the login (e-mail code or
   Google). The hub and the apps know the person by e-mail address. There is no PIN login outside, and the home cookie
   counts for nothing there.
+- **Managing happens at home**: people, PINs and apps can't be changed from outside, so a mailbox someone broke into
+  (past Cloudflare Access) can't take over the family's accounts.
 - **Start page**: at home every app, linking to its home address; outside only the apps with an outside address. An
   app without a tunnel route is home-only, and its address never leaves the house.
 

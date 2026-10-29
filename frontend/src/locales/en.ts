@@ -27,6 +27,7 @@ const en: typeof de = {
         changePin: 'Change PIN',
         pinChanged: 'PIN changed. Other devices are logged out now.',
         language: 'Language',
+        manageAtHome: 'The PIN, people and apps can be managed at home only, not from outside.',
         logoutEverywhere: 'Log out everywhere',
         confirmEverywhere: 'Log out on all devices and in all apps?',
     },

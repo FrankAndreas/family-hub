@@ -1,6 +1,6 @@
 """Logging in at home, logging out, and who one is."""
 
-from fastapi import APIRouter, Depends, Response
+from fastapi import APIRouter, Depends, Request, Response
 from sqlalchemy.orm import Session
 
 from . import auth, config, models, schemas
@@ -10,8 +10,9 @@ from .errors import api_error
 router = APIRouter(tags=["people"])
 
 
-def person_out(person: models.Person) -> schemas.PersonOut:
+def person_out(person: models.Person, at_home: bool = True) -> schemas.PersonOut:
     return schemas.PersonOut(
+        at_home=at_home,
         id=person.id,
         name=person.name,
         email=person.email,
@@ -60,8 +61,8 @@ def logout_everywhere(
 
 
 @router.get("/me", response_model=schemas.PersonOut)
-def me(person: models.Person = Depends(auth.current_person)):
-    return person_out(person)
+def me(request: Request, person: models.Person = Depends(auth.current_person)):
+    return person_out(person, not auth.through_tunnel(request))
 
 
 # Managing the family's people: parents, and everyone for their own PIN, language and colour
@@ -154,7 +155,7 @@ def set_pin(person_id: int, body: schemas.PinIn, db: Session = Depends(get_db)):
     return {"ok": True}
 
 
-@router.put("/me/pin")
+@router.put("/me/pin", dependencies=[Depends(auth.require_manage_at_home)])
 def set_own_pin(
     body: schemas.OwnPinIn,
     response: Response,
@@ -172,7 +173,10 @@ def set_own_pin(
 
 @router.patch("/me", response_model=schemas.PersonOut)
 def change_me(
-    body: schemas.MePatch, person: models.Person = Depends(auth.current_person), db: Session = Depends(get_db)
+    body: schemas.MePatch,
+    request: Request,
+    person: models.Person = Depends(auth.current_person),
+    db: Session = Depends(get_db),
 ):
     fields = body.model_fields_set
     if "language" in fields:
@@ -180,4 +184,4 @@ def change_me(
     if "color" in fields:
         person.color = body.color
     db.commit()
-    return person_out(person)
+    return person_out(person, not auth.through_tunnel(request))

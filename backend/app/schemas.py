@@ -25,6 +25,8 @@ class PersonOut(BaseModel):
     language: str
     # Whether the person picked the language themselves (else the default)
     language_chosen: bool
+    # Managing people, PINs and apps happens at home only: the settings page shows it outside
+    at_home: bool = True
 
 
 PIN = r"^\d{4}$"

@@ -9,6 +9,8 @@ export interface Person {
     color: string | null;
     language: 'de' | 'en';
     language_chosen: boolean;
+    // Managing people, PINs and apps happens at home only
+    at_home: boolean;
 }
 
 // On the start page: the address for where one is (home or outside)
