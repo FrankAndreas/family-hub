@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom';
 import { useAuth } from '../AuthContext';
 import { BUTTON_SECONDARY } from '../ui';
 import LoginAgain from './LoginAgain';
+import { logoutAddress } from '../next';
 
 // The frame of every page once logged in: the family's name, Start, Settings, and logging out
 export default function Layout({ children }: { children: ReactNode }) {
@@ -17,7 +18,11 @@ export default function Layout({ children }: { children: ReactNode }) {
                     <Link to="/" className="text-slate-300 hover:text-white">{t('nav.start')}</Link>
                     <Link to="/settings" className="text-slate-300 hover:text-white">{t('nav.settings')}</Link>
                     {person && (
-                        <button type="button" className={BUTTON_SECONDARY} onClick={() => void logout()}>
+                        <button type="button" className={BUTTON_SECONDARY} onClick={() => {
+                            const outside = logoutAddress(person.at_home);
+                            if (outside) window.location.href = outside;
+                            else void logout();
+                        }}>
                             {t('nav.logout')}
                         </button>
                     )}

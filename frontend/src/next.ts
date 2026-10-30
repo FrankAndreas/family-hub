@@ -27,3 +27,9 @@ export function safeNext(next: string | null, tileUrls: string[], hubHost: strin
 export function logoutTarget(next: string | null): string {
     return next ? `/?next=${encodeURIComponent(next)}` : '/';
 }
+
+// Where "Log out" goes: at home the hub ends its own login (its API); outside the login is Cloudflare Access's, which
+// its logout address ends
+export function logoutAddress(atHome: boolean): string | null {
+    return atHome ? null : '/cdn-cgi/access/logout';
+}

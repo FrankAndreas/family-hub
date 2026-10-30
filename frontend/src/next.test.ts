@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { logoutTarget, safeNext } from './next';
+import { logoutAddress, logoutTarget, safeNext } from './next';
 
 describe('safeNext', () => {
     const tiles = ['https://budget.local.example.ch', 'https://essen.local.example.ch/'];
@@ -38,5 +38,14 @@ describe('logoutTarget', () => {
     it('goes to the login without one', () => {
         expect(logoutTarget(null)).toBe('/');
         expect(logoutTarget('')).toBe('/');
+    });
+});
+
+describe('logoutAddress', () => {
+    it('at home the hub logs out itself (its API)', () => {
+        expect(logoutAddress(true)).toBeNull();
+    });
+    it('outside Cloudflare Access ends the e-mail-code login', () => {
+        expect(logoutAddress(false)).toBe('/cdn-cgi/access/logout');
     });
 });
