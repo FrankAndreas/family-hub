@@ -23,4 +23,6 @@ export interface TileFull {
     id: number; name: string; icon: string; local_url: string; remote_url: string | null; position: number;
     // Apps that use the family login: their key, and the ids of the people who may use them
     app_key: string | null; people: number[];
+    // The app may see its people's confirmed e-mail addresses
+    share_email: boolean;
 }

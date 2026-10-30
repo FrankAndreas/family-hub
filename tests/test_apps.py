@@ -57,3 +57,29 @@ def test_renamed_key(client, db):
     # The old key is gone; the people stay with the tile
     assert client.get("/api/apps/budget/people", headers=headers).status_code == 404
     assert [p["name"] for p in client.get("/api/apps/money/people", headers=headers).json()] == ["Admin"]
+
+
+# Apps that need the addresses (the job tracking app: reminders, telling one's own mails apart) get them when a parent
+# switches it on for that app's tile; only confirmed ones (2026-10-30)
+def test_email_addresses_only_for_apps_allowed_to(client, db):
+    admin = db.query(models.Person).filter_by(name="Admin").one()
+    lena = make_person(db, "Lena", email="lena@example.org")
+    max_ = make_person(db, "Max")
+    max_.email_pending = "max@example.org"
+    tile = budget(db, admin, lena, max_)
+    headers = bearer(auth.issue_tokens(admin)[0])
+    assert all("email" not in p for p in client.get("/api/apps/budget/people", headers=headers).json())
+    tile.share_email = True
+    db.commit()
+    found = {p["name"]: p["email"] for p in client.get("/api/apps/budget/people", headers=headers).json()}
+    assert found == {"Admin": None, "Lena": "lena@example.org", "Max": None}
+
+
+def test_parents_switch_email_sharing_on_a_tile(client):
+    from helpers import login
+
+    login(client)
+    body = {"name": "Bewerbungen", "local_url": "https://job.local.example.ch", "app_key": "jobs"}
+    tile = client.post("/api/tiles", json=body).json()
+    assert tile["share_email"] is False
+    assert client.patch(f"/api/tiles/{tile['id']}", json={"share_email": True}).json()["share_email"] is True

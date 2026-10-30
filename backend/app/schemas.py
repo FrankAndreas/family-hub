@@ -100,6 +100,8 @@ class TileIn(BaseModel):
     app_key: str | None = Field(default=None, pattern=APP_KEY)
     # Ids of the people who may use the app (with an app key)
     people: list[int] = []
+    # The app may see its people's confirmed e-mail addresses
+    share_email: bool = False
 
 
 class TilePatch(BaseModel):
@@ -109,6 +111,7 @@ class TilePatch(BaseModel):
     remote_url: str | None = Field(default=None, max_length=300, pattern=URL)
     app_key: str | None = Field(default=None, pattern=APP_KEY)
     people: list[int] | None = None
+    share_email: bool | None = None
 
 
 class TileOut(BaseModel):
@@ -120,6 +123,7 @@ class TileOut(BaseModel):
     position: int
     app_key: str | None
     people: list[int]
+    share_email: bool
 
     @field_validator("people", mode="before")
     @classmethod

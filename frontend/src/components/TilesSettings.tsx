@@ -4,9 +4,12 @@ import api, { errorMessage } from '../api';
 import type { Person, TileFull } from '../types';
 import { BUTTON, BUTTON_SECONDARY, CARD, ERROR, INPUT } from '../ui';
 
-interface Form { id: number | null; name: string; icon: string; local_url: string; remote_url: string; app_key: string; people: number[] }
+interface Form {
+    id: number | null; name: string; icon: string; local_url: string; remote_url: string; app_key: string; people: number[];
+    share_email: boolean;
+}
 
-const empty: Form = { id: null, name: '', icon: '', local_url: '', remote_url: '', app_key: '', people: [] };
+const empty: Form = { id: null, name: '', icon: '', local_url: '', remote_url: '', app_key: '', people: [], share_email: false };
 
 // Parents: the apps on the start page; without an outside address an app is shown at home only. An app that uses the
 // family login has a key, and only the people ticked for it see and use it
@@ -39,7 +42,7 @@ export default function TilesSettings() {
         const app_key = form.app_key.trim() || null;
         const body = {
             name: form.name, icon: form.icon, local_url: form.local_url.trim(), remote_url: form.remote_url.trim() || null,
-            app_key, people: app_key ? form.people : [],
+            app_key, people: app_key ? form.people : [], share_email: Boolean(app_key) && form.share_email,
         };
         void call(async () => {
             if (form.id === null) await api.post('/api/tiles', body);
@@ -101,6 +104,11 @@ export default function TilesSettings() {
                                     </label>
                                 ))}
                             </div>
+                            <label className="mt-2 flex items-center gap-1 text-slate-200">
+                                <input type="checkbox" checked={form.share_email}
+                                    onChange={e => setForm({ ...form, share_email: e.target.checked })} />
+                                {t('tiles.shareEmail')}
+                            </label>
                         </fieldset>
                     )}
                     <div className="flex gap-2 sm:col-span-2">
@@ -124,7 +132,7 @@ export default function TilesSettings() {
                             <button type="button" className="text-blue-300 hover:underline" aria-label={t('tiles.editOf', { name: tile.name })}
                                 onClick={() => setForm({
                                     id: tile.id, name: tile.name, icon: tile.icon, local_url: tile.local_url, remote_url: tile.remote_url ?? '',
-                                    app_key: tile.app_key ?? '', people: tile.people,
+                                    app_key: tile.app_key ?? '', people: tile.people, share_email: tile.share_email,
                                 })}>
                                 {t('common.edit')}
                             </button>
