@@ -4,6 +4,8 @@ export interface Person {
     id: number;
     name: string;
     email: string | null;
+    // Entered, waiting until the link mailed to it is opened; only then it counts
+    email_pending: string | null;
     role: Role;
     active: boolean;
     color: string | null;

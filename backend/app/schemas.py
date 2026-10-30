@@ -19,6 +19,8 @@ class PersonOut(BaseModel):
     id: int
     name: str
     email: str | None
+    # Entered, waiting until the link mailed to it is opened
+    email_pending: str | None = None
     role: Role
     active: bool
     color: str | None
@@ -57,6 +59,10 @@ class PersonPatch(BaseModel):
 
 class PinIn(BaseModel):
     pin: str = Field(pattern=PIN)
+
+
+class EmailConfirmIn(BaseModel):
+    token: str = Field(min_length=1, max_length=100)
 
 
 class PinResetIn(BaseModel):

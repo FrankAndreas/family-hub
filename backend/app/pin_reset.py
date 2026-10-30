@@ -90,14 +90,22 @@ def flush() -> None:
         _pending.pop(0).result()
 
 
-def _send_later(send: Sender, mail_from: str, to: list[str], subject: str, text: str, html_body: str) -> None:
+def send_later(
+    send: Sender, mail_from: str, to: list[str], subject: str, text: str, html_body: str, kind: str = "PIN reset"
+) -> None:
     def deliver() -> None:
         try:
             send(mail_from, to, subject, text, html_body)
         except Exception as error:  # noqa: BLE001 - whatever went wrong, nobody waits for it
-            logger.warning("PIN reset mail failed: %s", type(error).__name__)
+            logger.warning("%s mail failed: %s", kind, type(error).__name__)
 
     _pending.append(_mailer.submit(deliver))
+
+
+def mail_bodies(text: str, link: str) -> tuple[str, str]:
+    """The plain text, and the same as simple HTML with the link clickable (everything escaped)."""
+    safe = html.escape(text).replace(html.escape(link), f'<a href="{html.escape(link)}">{html.escape(link)}</a>')
+    return text, "<p>" + safe.replace("\n\n", "</p><p>").replace("\n", "<br>") + "</p>"
 
 
 def _hash(token: str) -> str:
@@ -133,11 +141,9 @@ def request_reset(db: Session, name: str, send: Sender | None = None) -> None:
             return
         link = create_link(db, person)
     texts = TEXTS[person.language or config.default_language()]
-    text = texts["body"].format(name=person.name, link=link)
-    safe = html.escape(text).replace(html.escape(link), f'<a href="{html.escape(link)}">{html.escape(link)}</a>')
-    html_body = "<p>" + safe.replace("\n\n", "</p><p>").replace("\n", "<br>") + "</p>"
+    text, html_body = mail_bodies(texts["body"].format(name=person.name, link=link), link)
     # resend_send looked up now, not at import: tests replace it
-    _send_later(send or resend_send, config.env("MAIL_FROM"), [person.email], texts["subject"], text, html_body)
+    send_later(send or resend_send, config.env("MAIL_FROM"), [person.email], texts["subject"], text, html_body)
 
 
 def end_links(db: Session, person: models.Person) -> None:

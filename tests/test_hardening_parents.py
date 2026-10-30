@@ -43,7 +43,7 @@ def test_own_email_needs_pin(client):
     wrong = client.patch(f"/api/people/{me}", json={"email": "admin@example.org", "current_pin": "0000"})
     assert wrong.status_code == 401 and wrong.json()["detail"] == "wrong_pin"
     right = client.patch(f"/api/people/{me}", json={"email": "admin@example.org", "current_pin": "1234"})
-    assert right.status_code == 200 and right.json()["email"] == "admin@example.org"
+    assert right.status_code == 200 and right.json()["email_pending"] == "admin@example.org"
     lena = add_person(client, "Lena")
     assert client.patch(f"/api/people/{lena['id']}", json={"email": "lena@example.org"}).status_code == 200
 

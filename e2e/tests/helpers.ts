@@ -11,12 +11,12 @@ export const ADMIN_PIN = '1111';
 // The hub writes its mails here in the tests (MAIL_OUTBOX) instead of sending them
 export const OUTBOX = path.resolve(__dirname, '..', '.tmp', 'outbox.jsonl');
 
-// The reset link in the last mail to this address
-export function lastResetLink(to: string): string {
+// The link to this page (reset-pin, confirm-email) in the last such mail to this address
+export function lastLink(to: string, page: 'reset-pin' | 'confirm-email'): string {
     const mails = fs.readFileSync(OUTBOX, 'utf-8').trim().split('\n').map(line => JSON.parse(line) as { to: string[]; text: string });
-    const mail = mails.reverse().find(m => m.to.includes(to));
-    const link = mail?.text.match(/http\S+\/reset-pin#token=\S+/)?.[0];
-    if (!link) throw new Error(`no reset link for ${to}`);
+    const pattern = new RegExp(`http\\S+/${page}#token=\\S+`);
+    const link = mails.reverse().map(m => m.to.includes(to) ? m.text.match(pattern)?.[0] : undefined).find(Boolean);
+    if (!link) throw new Error(`no ${page} link for ${to}`);
     return link;
 }
 

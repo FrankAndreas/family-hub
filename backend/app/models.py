@@ -26,6 +26,9 @@ class Person(Base):
     name_key: Mapped[str] = mapped_column(String(50), unique=True)
     # How Cloudflare Access knows the person outside; stored casefolded, unique
     email: Mapped[str | None] = mapped_column(String(254), unique=True)
+    # An address someone entered, waiting until a link mailed to it is opened (security review 2026-10-30): only then
+    # it becomes `email`, the Cloudflare login and the way back in with a forgotten PIN
+    email_pending: Mapped[str | None] = mapped_column(String(254))
     pin_hash: Mapped[str] = mapped_column(String)
     role: Mapped[Role] = mapped_column(Enum(Role), default=Role.CHILD)
     # An inactive person can't log in, and the apps hear their logins are no longer valid
@@ -101,6 +104,20 @@ class PinReset(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     person_id: Mapped[int] = mapped_column(ForeignKey("people.id", ondelete="CASCADE"))
+    token_hash: Mapped[str] = mapped_column(String(64), unique=True)
+    created_at: Mapped[datetime] = mapped_column(default=utcnow)
+    expires_at: Mapped[datetime]
+    used_at: Mapped[datetime | None]
+
+
+class EmailConfirm(Base):
+    """A link that confirms a person's new e-mail address: only its SHA-256 is kept; it works once."""
+
+    __tablename__ = "email_confirms"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    person_id: Mapped[int] = mapped_column(ForeignKey("people.id", ondelete="CASCADE"))
+    email: Mapped[str] = mapped_column(String(254))
     token_hash: Mapped[str] = mapped_column(String(64), unique=True)
     created_at: Mapped[datetime] = mapped_column(default=utcnow)
     expires_at: Mapped[datetime]
