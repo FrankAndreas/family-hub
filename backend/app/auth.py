@@ -86,6 +86,15 @@ def _pin_lock(person_id: int) -> threading.Lock:
         return _pin_locks.setdefault(person_id, threading.Lock())
 
 
+def new_pin(person: models.Person, pin: str) -> None:
+    """A new PIN ends every login made with the old one and lifts a lock."""
+    person.pin_hash = get_pin_hash(pin)
+    person.token_version += 1
+    person.failed_logins = 0
+    person.lockouts = 0
+    person.locked_until = None
+
+
 def _secret_hash(secret: str) -> str:
     return hashlib.sha256(secret.encode()).hexdigest()
 

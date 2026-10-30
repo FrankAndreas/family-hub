@@ -5,7 +5,7 @@ import threading
 from fastapi import APIRouter, Depends, Request, Response
 from sqlalchemy.orm import Session
 
-from . import auth, config, models, schemas
+from . import auth, config, models, pin_reset, schemas
 from .database import get_db
 from .errors import api_error
 
@@ -29,7 +29,20 @@ def person_out(person: models.Person, at_home: bool = True) -> schemas.PersonOut
 @router.get("/config")
 def public_config():
     """What the login screen needs before anyone is logged in: the language for browsers that speak neither."""
-    return {"default_language": config.default_language()}
+    return {"default_language": config.default_language(), "pin_reset": pin_reset.is_configured()}
+
+
+@router.post("/pin-reset", dependencies=[Depends(auth.require_home)])
+def ask_pin_reset(body: schemas.PinResetIn, db: Session = Depends(get_db)):
+    """Forgot PIN: a link to the person's address, if any. The same answer whatever the case."""
+    pin_reset.request_reset(db, body.name)
+    return {"ok": True}
+
+
+@router.post("/pin-reset/confirm", dependencies=[Depends(auth.require_home)])
+def confirm_pin_reset(body: schemas.PinResetConfirmIn, db: Session = Depends(get_db)):
+    pin_reset.confirm(db, body.token, body.pin)
+    return {"ok": True}
 
 
 @router.get("/people/public", response_model=list[schemas.PersonPublic], dependencies=[Depends(auth.require_home)])
@@ -89,15 +102,6 @@ def _check_free(db: Session, name: str | None, email: str | None, except_id: int
         raise api_error(409, "name_taken")
     if email and others.filter(models.Person.email == email.strip().casefold()).first():
         raise api_error(409, "email_taken")
-
-
-def _new_pin(person: models.Person, pin: str) -> None:
-    """A new PIN ends every login made with the old one and lifts a lock."""
-    person.pin_hash = auth.get_pin_hash(pin)
-    person.token_version += 1
-    person.failed_logins = 0
-    person.lockouts = 0
-    person.locked_until = None
 
 
 @router.get("/people", response_model=list[schemas.PersonOut], dependencies=[Depends(auth.require_parent)])
@@ -195,7 +199,7 @@ def set_pin(
 ):
     person = _get(db, person_id)
     _not_another_parent(actor, person)
-    _new_pin(person, body.pin)
+    auth.new_pin(person, body.pin)
     db.commit()
     return {"ok": True}
 
@@ -209,7 +213,7 @@ def set_own_pin(
 ):
     # Counts toward the lock like a login: a session alone doesn't let anyone try PINs
     auth.check_pin(db, person, body.old_pin, api_error(401, "wrong_pin"))
-    _new_pin(person, body.pin)
+    auth.new_pin(person, body.pin)
     db.commit()
     # Other devices are logged out; this one stays
     auth.set_cookies(response, *auth.issue_tokens(person))

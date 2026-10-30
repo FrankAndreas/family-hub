@@ -59,6 +59,15 @@ class PinIn(BaseModel):
     pin: str = Field(pattern=PIN)
 
 
+class PinResetIn(BaseModel):
+    name: str = Field(min_length=1, max_length=50)
+
+
+class PinResetConfirmIn(BaseModel):
+    token: str = Field(min_length=1, max_length=100)
+    pin: str = Field(pattern=PIN)
+
+
 class OwnPinIn(BaseModel):
     old_pin: str = Field(pattern=PIN)
     pin: str = Field(pattern=PIN)
