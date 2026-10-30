@@ -27,6 +27,8 @@ test('people, tiles and the start page', async ({ page }) => {
     await expect(tile).toHaveAttribute('href', 'https://essen.local.example.ch');
 
     await page.getByRole('button', { name: 'Log out' }).click();
+    // Wait for the logout to reach the server before logIn() loads the page again
+    await expect(page.getByRole('heading', { name: 'Who are you?' })).toBeVisible();
     await logIn(page, lena, '2468');
     await expect(page.getByRole('link', { name: new RegExp(app) })).toBeVisible();
     // Children don't manage people or apps
