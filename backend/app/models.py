@@ -1,7 +1,7 @@
 import enum
 from datetime import datetime
 
-from sqlalchemy import Column, Enum, ForeignKey, String, Table, UniqueConstraint
+from sqlalchemy import Column, Enum, ForeignKey, String, Table, UniqueConstraint, false
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .database import Base
@@ -70,6 +70,9 @@ class Tile(Base):
     # Set for an app that uses the family login, e.g. "budget": it asks the hub for access and its people by this key.
     # None: a plain link, shown to everyone
     app_key: Mapped[str | None] = mapped_column(String(20), unique=True)
+    # The app may see its people's confirmed e-mail addresses (e.g. the job tracking app: reminders, its own mails);
+    # other apps get no addresses (2026-10-30)
+    share_email: Mapped[bool] = mapped_column(default=False, server_default=false())
     people: Mapped[list[Person]] = relationship(secondary=tile_access, order_by=Person.id)
 
 

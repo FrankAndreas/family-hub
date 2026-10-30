@@ -82,6 +82,7 @@ const en: typeof de = {
         appKey: 'App key',
         appKeyHint: 'only for apps that use the family login, e.g. budget',
         who: 'Who may use it',
+        shareEmail: 'The app may see their confirmed e-mail addresses (e.g. for reminders)',
         peopleCount_one: '{{count}} person',
         peopleCount_other: '{{count}} people',
     },

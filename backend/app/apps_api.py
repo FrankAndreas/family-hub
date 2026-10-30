@@ -1,7 +1,8 @@
 """What an app pulls from the hub: the people who may use it (spec 2026-10-30, part A).
 
 Asked with the login of whoever uses the app at that moment (as /api/session), so an app needs no password of its own.
-No e-mail addresses or PIN data: an app only needs to know and show its people."""
+No PIN data, and e-mail addresses only for an app whose tile allows it (`share_email`), and only confirmed ones: most
+apps only need to know and show their people."""
 
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
@@ -29,6 +30,7 @@ def app_people(key: str, person: models.Person | None = Depends(session_api.call
             "role": p.role.value,
             "color": p.color,
             "language": p.language or config.default_language(),
+            **({"email": p.email} if tile.share_email else {}),
         }
         for p in sorted(tile.people, key=lambda p: p.name_key)
         if p.active

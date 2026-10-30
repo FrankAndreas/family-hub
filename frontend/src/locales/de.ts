@@ -80,6 +80,7 @@ const de = {
         appKey: 'App-Schlüssel',
         appKeyHint: 'nur für Apps mit dem Familien-Login, z. B. budget',
         who: 'Wer darf sie nutzen',
+        shareEmail: 'Die App darf ihre bestätigten E-Mail-Adressen sehen (z. B. für Erinnerungen)',
         peopleCount_one: '{{count}} Person',
         peopleCount_other: '{{count}} Personen',
     },

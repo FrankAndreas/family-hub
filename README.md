@@ -47,7 +47,8 @@ people who may use it; only they see its tile. The app asks `GET <hub>/api/sessi
 access" (say so; sending them to the hub would bring them straight back, again and again).
 
 **The app's people.** `GET <hub>/api/apps/<key>/people`, asked with the same login as `/api/session`, lists the active
-people with access: `[{"id", "name", "role", "color", "language"}]` (no e-mail). 403 when the person asking has no
+people with access: `[{"id", "name", "role", "color", "language"}]`. An app whose tile allows it ("may see e-mail
+addresses", e.g. the job tracking app) also gets `"email"`: the person's confirmed address or `null`; other apps get none. 403 when the person asking has no
 access, 404 for an unknown key. The app keeps its own copy keyed by `id`, refreshes it now and then, and hides people
 who left the list instead of deleting their data. Logging out everywhere, a new PIN and deactivating a
 person all end a login. The app keeps its own data per person under the hub's `person.id`.
