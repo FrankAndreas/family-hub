@@ -1,0 +1,11 @@
+fastapi==0.162.0
+uvicorn==0.54.0
+sqlalchemy==2.1.6
+pydantic==2.14.1
+bcrypt==5.0.0
+pyjwt==2.15.1
+# EdDSA signatures for the login tokens, RS256 for Cloudflare Access tokens
+cryptography==50.0.2
+alembic==1.20.1
+# Time zone database for zoneinfo; the slim Docker image has none
+tzdata==2026.5
