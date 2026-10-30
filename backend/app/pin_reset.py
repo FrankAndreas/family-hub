@@ -9,8 +9,10 @@ import html
 import json
 import logging
 import secrets
+import threading
 import urllib.request
 from collections.abc import Callable
+from concurrent.futures import Future, ThreadPoolExecutor
 from datetime import timedelta
 
 from sqlalchemy.orm import Session
@@ -28,6 +30,13 @@ TIMEOUT_SECONDS = 20
 
 # (mail_from, to, subject, text, html)
 Sender = Callable[[str, list[str], str, str, str], None]
+
+# Mails go out after the answer (security review 2026-10-30): how long the answer took would tell who has an address,
+# and Resend's round trip shouldn't hold a request. One at a time is plenty for a family
+_mailer = ThreadPoolExecutor(max_workers=1, thread_name_prefix="mailer")
+_pending: list[Future] = []
+# Counting the links of the last hour and adding one happen together, so requests at once can't pass the limit
+_limit_lock = threading.Lock()
 
 TEXTS = {
     "de": {
@@ -75,6 +84,22 @@ def resend_send(mail_from: str, to: list[str], subject: str, text: str, html_bod
         pass
 
 
+def flush() -> None:
+    """Wait for the mails handed to the mailer so far (tests; mails are otherwise sent in the background)."""
+    while _pending:
+        _pending.pop(0).result()
+
+
+def _send_later(send: Sender, mail_from: str, to: list[str], subject: str, text: str, html_body: str) -> None:
+    def deliver() -> None:
+        try:
+            send(mail_from, to, subject, text, html_body)
+        except Exception as error:  # noqa: BLE001 - whatever went wrong, nobody waits for it
+            logger.warning("PIN reset mail failed: %s", type(error).__name__)
+
+    _pending.append(_mailer.submit(deliver))
+
+
 def _hash(token: str) -> str:
     return hashlib.sha256(token.encode()).hexdigest()
 
@@ -98,22 +123,21 @@ def request_reset(db: Session, name: str, send: Sender | None = None) -> None:
     person = db.query(models.Person).filter(models.Person.name_key == auth.name_key(name)).first()
     if person is None or not person.active or not person.email:
         return
-    recent = (
-        db.query(models.PinReset)
-        .filter(models.PinReset.person_id == person.id, models.PinReset.created_at > utcnow() - timedelta(hours=1))
-        .count()
-    )
-    if recent >= MAX_PER_HOUR:
-        return
-    link = create_link(db, person)
+    with _limit_lock:
+        recent = (
+            db.query(models.PinReset)
+            .filter(models.PinReset.person_id == person.id, models.PinReset.created_at > utcnow() - timedelta(hours=1))
+            .count()
+        )
+        if recent >= MAX_PER_HOUR:
+            return
+        link = create_link(db, person)
     texts = TEXTS[person.language or config.default_language()]
     text = texts["body"].format(name=person.name, link=link)
     safe = html.escape(text).replace(html.escape(link), f'<a href="{html.escape(link)}">{html.escape(link)}</a>')
     html_body = "<p>" + safe.replace("\n\n", "</p><p>").replace("\n", "<br>") + "</p>"
-    try:
-        (send or resend_send)(config.env("MAIL_FROM"), [person.email], texts["subject"], text, html_body)
-    except Exception as error:  # noqa: BLE001 - whatever went wrong, the answer stays the same
-        logger.warning("PIN reset mail failed: %s", type(error).__name__)
+    # resend_send looked up now, not at import: tests replace it
+    _send_later(send or resend_send, config.env("MAIL_FROM"), [person.email], texts["subject"], text, html_body)
 
 
 def end_links(db: Session, person: models.Person) -> None:
@@ -126,10 +150,21 @@ def end_links(db: Session, person: models.Person) -> None:
 def confirm(db: Session, token: str, pin: str) -> None:
     """Set the new PIN with a reset link: it ends the person's logins, lifts a lock and every other open link."""
     invalid = api_error(400, "reset_link_invalid")
-    reset = db.query(models.PinReset).filter(models.PinReset.token_hash == _hash(token)).first()
     now = utcnow()
-    if reset is None or reset.used_at is not None or reset.expires_at < now:
+    # Claimed in one step: of two uses at the same moment, only one finds the link unused (security review 2026-10-30)
+    claimed = (
+        db.query(models.PinReset)
+        .filter(
+            models.PinReset.token_hash == _hash(token),
+            models.PinReset.used_at.is_(None),
+            models.PinReset.expires_at >= now,
+        )
+        .update({models.PinReset.used_at: now})
+    )
+    db.commit()
+    if claimed != 1:
         raise invalid
+    reset = db.query(models.PinReset).filter(models.PinReset.token_hash == _hash(token)).one()
     person = db.get(models.Person, reset.person_id)
     if person is None or not person.active:
         raise invalid
