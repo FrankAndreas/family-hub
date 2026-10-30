@@ -1,6 +1,6 @@
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from .models import Role
 
@@ -69,6 +69,8 @@ class MePatch(BaseModel):
 
 # https only; http only for a development server on this machine
 URL = r"^(https://[^\s/]+(/\S*)?|http://(localhost|127\.0\.0\.1)(:\d+)?(/\S*)?)$"
+# An app's key: lowercase letters, digits and dashes, starting with a letter, 2 to 20 long
+APP_KEY = r"^[a-z][a-z0-9-]{1,19}$"
 
 
 class TileIn(BaseModel):
@@ -77,6 +79,10 @@ class TileIn(BaseModel):
     local_url: str = Field(max_length=300, pattern=URL)
     # None: the app is reachable at home only
     remote_url: str | None = Field(default=None, max_length=300, pattern=URL)
+    # Only for apps that use the family login; lowercase, e.g. "budget"
+    app_key: str | None = Field(default=None, pattern=APP_KEY)
+    # Ids of the people who may use the app (with an app key)
+    people: list[int] = []
 
 
 class TilePatch(BaseModel):
@@ -84,6 +90,8 @@ class TilePatch(BaseModel):
     icon: str | None = Field(default=None, max_length=16)
     local_url: str | None = Field(default=None, max_length=300, pattern=URL)
     remote_url: str | None = Field(default=None, max_length=300, pattern=URL)
+    app_key: str | None = Field(default=None, pattern=APP_KEY)
+    people: list[int] | None = None
 
 
 class TileOut(BaseModel):
@@ -93,3 +101,10 @@ class TileOut(BaseModel):
     local_url: str
     remote_url: str | None
     position: int
+    app_key: str | None
+    people: list[int]
+
+    @field_validator("people", mode="before")
+    @classmethod
+    def person_ids(cls, value):
+        return sorted(p if isinstance(p, int) else p.id for p in value)

@@ -22,6 +22,21 @@ def _get(db: Session, tile_id: int) -> models.Tile:
     return tile
 
 
+def _people(db: Session, ids: list[int]) -> list[models.Person]:
+    found = db.query(models.Person).filter(models.Person.id.in_(ids)).all()
+    if len(found) != len(set(ids)):
+        raise api_error(400, "person_not_found")
+    return found
+
+
+def _check_key(db: Session, key: str | None, tile_id: int | None = None) -> None:
+    if key is None:
+        return
+    other = db.query(models.Tile).filter(models.Tile.app_key == key).first()
+    if other is not None and other.id != tile_id:
+        raise api_error(409, "app_key_taken")
+
+
 @router.get("/tiles", dependencies=[Depends(auth.current_person)])
 def tiles(request: Request, db: Session = Depends(get_db)):
     outside = auth.through_tunnel(request)
@@ -45,8 +60,13 @@ def manage_tiles(db: Session = Depends(get_db)):
 
 @router.post("/tiles", status_code=201, response_model=schemas.TileOut, dependencies=[Depends(auth.require_parent)])
 def add_tile(body: schemas.TileIn, db: Session = Depends(get_db)):
+    _check_key(db, body.app_key)
     last = db.query(models.Tile).order_by(models.Tile.position.desc()).first()
-    tile = models.Tile(**body.model_dump(), position=(last.position + 1) if last else 0)
+    tile = models.Tile(
+        **body.model_dump(exclude={"people"}),
+        people=_people(db, body.people),
+        position=(last.position + 1) if last else 0,
+    )
     db.add(tile)
     db.commit()
     return tile
@@ -55,10 +75,16 @@ def add_tile(body: schemas.TileIn, db: Session = Depends(get_db)):
 @router.patch("/tiles/{tile_id}", response_model=schemas.TileOut, dependencies=[Depends(auth.require_parent)])
 def change_tile(tile_id: int, body: schemas.TilePatch, db: Session = Depends(get_db)):
     tile = _get(db, tile_id)
+    if "app_key" in body.model_fields_set:
+        _check_key(db, body.app_key, tile.id)
     for field in body.model_fields_set:
         value = getattr(body, field)
-        # Name, icon and the home address can't be emptied; the outside address can (home only)
-        if value is None and field != "remote_url":
+        if field == "people":
+            if value is not None:
+                tile.people = _people(db, value)
+            continue
+        # Name, icon and the home address can't be emptied; the outside address and the app key can
+        if value is None and field not in ("remote_url", "app_key"):
             continue
         setattr(tile, field, value)
     db.commit()
