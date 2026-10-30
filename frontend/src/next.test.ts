@@ -4,14 +4,30 @@ import { logoutTarget, safeNext } from './next';
 describe('safeNext', () => {
     const tiles = ['https://budget.local.example.ch', 'https://essen.local.example.ch/'];
     it('goes back to an app on the start page', () => {
-        expect(safeNext('https://budget.local.example.ch/accounts?x=1', tiles)).toBe('https://budget.local.example.ch/accounts?x=1');
+        expect(safeNext('https://budget.local.example.ch/accounts?x=1', tiles, 'home.local.example.ch')).toBe('https://budget.local.example.ch/accounts?x=1');
     });
     it('refuses anything else', () => {
-        expect(safeNext('https://evil.example.com/', tiles)).toBeNull();
-        expect(safeNext('https://budget.local.example.ch.evil.com/', tiles)).toBeNull();
-        expect(safeNext('javascript:alert(1)', tiles)).toBeNull();
-        expect(safeNext('/settings', tiles)).toBeNull();
-        expect(safeNext(null, tiles)).toBeNull();
+        const hub = 'home.local.example.ch';
+        expect(safeNext('https://evil.example.com/', tiles, hub)).toBeNull();
+        expect(safeNext('https://budget.local.example.ch.evil.com/', tiles, hub)).toBeNull();
+        expect(safeNext('javascript:alert(1)', tiles, hub)).toBeNull();
+        expect(safeNext('/settings', tiles, hub)).toBeNull();
+        expect(safeNext(null, tiles, hub)).toBeNull();
+    });
+});
+
+// Security review 2026-10-30: a parent could add a tile for a site of their own and send the other parent there
+describe('safeNext, only the family\'s own addresses', () => {
+    const hub = 'home.local.example.ch';
+    const tiles = ['https://budget.local.example.ch', 'https://phish.example.com', 'http://localhost:3110'];
+    it('takes an app under the hub\'s own domain', () => {
+        expect(safeNext('https://budget.local.example.ch/', tiles, hub)).toBe('https://budget.local.example.ch/');
+    });
+    it('refuses a tile elsewhere', () => {
+        expect(safeNext('https://phish.example.com/', tiles, hub)).toBeNull();
+    });
+    it('takes the same machine in development', () => {
+        expect(safeNext('http://localhost:3110/settings', tiles, 'localhost')).toBe('http://localhost:3110/settings');
     });
 });
 

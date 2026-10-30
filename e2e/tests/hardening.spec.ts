@@ -72,3 +72,23 @@ test('logout with next', async ({ page, baseURL }) => {
     await page.getByRole('button', { name: 'Log in' }).click();
     await expect(page).toHaveURL(`${baseURL}/settings`);
 });
+
+// Security review 2026-10-30, finding 7: who-is-logged-in, asked as the logout page opens, may answer after the logout;
+// it must not bring the person back
+test('a late answer doesn\'t undo the logout', async ({ page }) => {
+    await logIn(page, 'Admin', ADMIN_PIN);
+    // The server answers "who is logged in" before the logout reaches it, and the answer arrives only after it
+    await page.route('**/api/logout', async route => {
+        await new Promise(resolve => setTimeout(resolve, 500));
+        await route.continue();
+    });
+    await page.route('**/api/me', async route => {
+        const response = await route.fetch();
+        await new Promise(resolve => setTimeout(resolve, 1500));
+        await route.fulfill({ response });
+    });
+    await page.goto('/logout');
+    await expect(page.getByRole('heading', { name: 'Who are you?' })).toBeVisible();
+    await page.waitForTimeout(2000);
+    await expect(page.getByRole('heading', { name: 'Who are you?' })).toBeVisible();
+});

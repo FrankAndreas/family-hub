@@ -1,6 +1,5 @@
 import { useState, type FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useSearchParams } from 'react-router-dom';
 import api, { errorMessage } from '../api';
 import PinInput from '../components/PinInput';
 import { BUTTON, CARD, ERROR } from '../ui';
@@ -8,7 +7,8 @@ import { BUTTON, CARD, ERROR } from '../ui';
 // The link from the "Forgot PIN" mail (or the NAS command): a new PIN, then the login
 export default function ResetPin() {
     const { t } = useTranslation();
-    const [params] = useSearchParams();
+    // After "#": the token never reaches a server or its access log (security review 2026-10-30)
+    const [token] = useState(() => new URLSearchParams(window.location.hash.slice(1)).get('token') ?? '');
     const [pin, setPin] = useState('');
     const [again, setAgain] = useState('');
     const [done, setDone] = useState(false);
@@ -21,7 +21,7 @@ export default function ResetPin() {
             return;
         }
         try {
-            await api.post('/api/pin-reset/confirm', { token: params.get('token') ?? '', pin });
+            await api.post('/api/pin-reset/confirm', { token, pin });
             setDone(true);
         } catch (err) {
             setError(errorMessage(err));

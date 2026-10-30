@@ -79,3 +79,26 @@ def test_own_pin_only_with_the_old_one(client):
     login(client)
     refused = client.put(f"/api/people/{own_id(client)}/pin", json={"pin": "9999"})
     assert refused.status_code == 403 and refused.json()["detail"] == "own_pin_needs_old_pin"
+
+
+# Security review 2026-10-30, finding 1: through the tiles one parent could cut the other off an app or replace it
+def _shared_tile(client, mia_id):
+    admin_id = own_id(client)
+    body = {"name": "Budget", "local_url": "https://budget.local.example.ch", "app_key": "budget"}
+    tile = client.post("/api/tiles", json={**body, "people": [admin_id, mia_id]}).json()
+    return tile, admin_id
+
+
+def test_a_parent_cant_take_an_app_from_another(client):
+    login(client)
+    mia = add_person(client, "Mia", role="PARENT")
+    lena = add_person(client, "Lena")
+    tile, admin_id = _shared_tile(client, mia["id"])
+    removed = client.patch(f"/api/tiles/{tile['id']}", json={"people": [admin_id]})
+    assert removed.status_code == 403 and removed.json()["detail"] == "other_parent"
+    assert client.patch(f"/api/tiles/{tile['id']}", json={"app_key": "other"}).status_code == 403
+    assert client.delete(f"/api/tiles/{tile['id']}").status_code == 403
+    # Children and oneself: as before
+    added = client.patch(f"/api/tiles/{tile['id']}", json={"people": [admin_id, mia["id"], lena["id"]]})
+    assert added.status_code == 200
+    assert client.patch(f"/api/tiles/{tile['id']}", json={"people": [mia["id"]]}).status_code == 200

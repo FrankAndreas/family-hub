@@ -89,7 +89,7 @@ Date: 2026-10-30. Issues: family-hub#4, family-hub#6. Agreed with the user in ch
   - Anyone with an e-mail address can use it, children too.
 - **Limit:** at most 3 reset mails per person per hour; requests beyond that are silently dropped.
 - **Link:**
-  - `<HUB_PUBLIC_URL>/reset-pin?token=<random 32 bytes, urlsafe>`;
+  - `<HUB_PUBLIC_URL>/reset-pin#token=<random 32 bytes, urlsafe>` (after `#`, so no access log holds it; security review 2026-10-30);
   - the hub stores only its SHA-256, with person, created time, expiry (30 minutes) and used time;
   - one use; using one ends that person's other open reset links.
 - **Mail:** plain text plus simple HTML, in the person's language (default language otherwise). Subject "Familien-Hub:

@@ -174,14 +174,17 @@ def change_person(
         _check_last_parent(db, person, body)
         if body.name is not None:
             person.name, person.name_key = body.name.strip(), auth.name_key(body.name)
-        if "email" in fields:
+        if "email" in fields and new_email != person.email:
             person.email = new_email
+            # Links sent to the old address stop working (security review 2026-10-30)
+            pin_reset.end_links(db, person)
         if body.role is not None:
             person.role = body.role
         if body.active is not None and body.active != person.active:
             person.active = body.active
-            # Deactivated: every app hears the logins are over
+            # Deactivated: every app hears the logins are over; open reset links end too
             person.token_version += 1
+            pin_reset.end_links(db, person)
         if "color" in fields:
             person.color = body.color
         if "language" in fields:

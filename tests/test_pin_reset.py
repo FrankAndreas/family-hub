@@ -13,7 +13,8 @@ from app import models, pin_reset, reset_pin
 from app.main import app
 from app.timeutil import utcnow
 
-LINK = re.compile(r"https://home\.local\.example\.ch/reset-pin\?token=([A-Za-z0-9_-]+)")
+# The token after "#": browsers never send that part, so no access log on the way holds it (security review 2026-10-30)
+LINK = re.compile(r"https://home\.local\.example\.ch/reset-pin#token=([A-Za-z0-9_-]+)")
 
 
 class Outbox:
@@ -164,3 +165,26 @@ def test_nas_command_prints_a_working_link(client, db, monkeypatch, capsys):
     assert found
     assert confirm(TestClient(app, headers=APP_HEADER), found.group(1)).status_code == 200
     assert reset_pin.main(["Nobody"]) == 1
+
+
+# Security review 2026-10-30, finding 3: a new address is the answer to a mailbox someone else reads, so the links
+# already sent there must stop working; so must a deactivated person's, even if they come back within the half hour
+def test_links_end_with_a_new_address(client, db, mail):
+    with_email(db)
+    ask(client)
+    token = mail.token()
+    login(client)
+    me = client.get("/api/me").json()["id"]
+    changed = client.patch(f"/api/people/{me}", json={"email": "new@example.org", "current_pin": ADMIN_PIN})
+    assert changed.status_code == 200
+    assert confirm(client, token).status_code == 400
+
+
+def test_links_end_when_deactivated(client, db, mail):
+    lena = make_person(db, "Lena", email="lena@example.org")
+    ask(client, "Lena")
+    token = mail.token()
+    login(client)
+    assert client.patch(f"/api/people/{lena.id}", json={"active": False}).status_code == 200
+    assert client.patch(f"/api/people/{lena.id}", json={"active": True}).status_code == 200
+    assert confirm(client, token).status_code == 400

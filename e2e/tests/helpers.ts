@@ -15,7 +15,7 @@ export const OUTBOX = path.resolve(__dirname, '..', '.tmp', 'outbox.jsonl');
 export function lastResetLink(to: string): string {
     const mails = fs.readFileSync(OUTBOX, 'utf-8').trim().split('\n').map(line => JSON.parse(line) as { to: string[]; text: string });
     const mail = mails.reverse().find(m => m.to.includes(to));
-    const link = mail?.text.match(/http\S+\/reset-pin\?token=\S+/)?.[0];
+    const link = mail?.text.match(/http\S+\/reset-pin#token=\S+/)?.[0];
     if (!link) throw new Error(`no reset link for ${to}`);
     return link;
 }

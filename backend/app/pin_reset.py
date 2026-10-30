@@ -1,5 +1,6 @@
 """A forgotten PIN (spec 2026-10-30 hub hardening, part 3): a link by e-mail through the Resend API, or printed on the
-NAS (app.reset_pin). Only the link's SHA-256 is kept; it works once, for 30 minutes, and at home only.
+NAS (app.reset_pin). The token sits after "#", which browsers never send, so no access log holds it. Only the
+link's SHA-256 is kept; it works once, for 30 minutes, and at home only.
 
 Nothing tells a stranger whether a name or an address exists, and no link, token or address reaches a log line."""
 
@@ -86,7 +87,7 @@ def create_link(db: Session, person: models.Person) -> str:
         models.PinReset(person_id=person.id, token_hash=_hash(token), created_at=now, expires_at=now + LINK_LIFETIME)
     )
     db.commit()
-    return f"{config.env('HUB_PUBLIC_URL').rstrip('/')}/reset-pin?token={token}"
+    return f"{config.env('HUB_PUBLIC_URL').rstrip('/')}/reset-pin#token={token}"
 
 
 def request_reset(db: Session, name: str, send: Sender | None = None) -> None:
@@ -115,6 +116,13 @@ def request_reset(db: Session, name: str, send: Sender | None = None) -> None:
         logger.warning("PIN reset mail failed: %s", type(error).__name__)
 
 
+def end_links(db: Session, person: models.Person) -> None:
+    """The person's open reset links stop working (a new e-mail address, deactivated); the caller commits."""
+    db.query(models.PinReset).filter(models.PinReset.person_id == person.id, models.PinReset.used_at.is_(None)).update(
+        {models.PinReset.used_at: utcnow()}
+    )
+
+
 def confirm(db: Session, token: str, pin: str) -> None:
     """Set the new PIN with a reset link: it ends the person's logins, lifts a lock and every other open link."""
     invalid = api_error(400, "reset_link_invalid")
@@ -126,7 +134,5 @@ def confirm(db: Session, token: str, pin: str) -> None:
     if person is None or not person.active:
         raise invalid
     auth.new_pin(person, pin)
-    db.query(models.PinReset).filter(models.PinReset.person_id == person.id, models.PinReset.used_at.is_(None)).update(
-        {models.PinReset.used_at: now}
-    )
+    end_links(db, person)
     db.commit()
