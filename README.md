@@ -14,6 +14,8 @@ same stack and look. German by default, English per person.
 - **Wrong PINs**: 5 in a row lock the person for 15 minutes, doubling up to a day. A browser the person logged in with
   before isn't locked by wrong PINs from other devices, so nobody at home can lock a parent out; its own wrong PINs
   count against it alone, and after 5 it is a device like any other.
+- **Own PIN only**: each parent changes their own PIN and details and the children's; never another parent's. A
+  forgotten PIN is reset with a link to the person's e-mail address, or from the NAS as the last resort.
 - **Managing happens at home**: people, PINs and apps can't be changed from outside, so a mailbox someone broke into
   (past Cloudflare Access) can't take over the family's accounts.
 - **Start page**: at home every app, linking to its home address; outside only the apps with an outside address. An
@@ -55,6 +57,13 @@ itself with the public key at `<hub>/.well-known/jwks.json`; asking `/api/sessio
 Apps only read from the hub. Every change (POST, PUT, PATCH, DELETE) needs the header `X-Requested-With: hub`, which
 the hub's own pages send: another page on the family's domain can make a browser send the login cookie, but not this
 header.
+
+Log out: send the person to `https://home.local.<domain>/logout?next=<the app's address>`. The hub ends that login
+(for the hub and every app; `/api/session` says so within the app's cache time) and shows the login, which leads back
+to the app. An app doesn't clear the cookie itself.
+
+Managing the hub (people, PINs, apps) needs a second cookie, `hub_manage`, that only the hub's own address gets: a
+`hub_session` an app passes on or leaks logs into the apps, but manages nothing.
 
 Not logged in: send the person to `https://home.local.<domain>/?next=<the app's address>`. After the login the hub
 sends them back, if the address belongs to an app on its start page.

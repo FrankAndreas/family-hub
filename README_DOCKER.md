@@ -67,7 +67,31 @@ Log in as `Admin`, then in **Einstellungen**:
 
 To choose the first PIN yourself, set `INITIAL_ADMIN_PIN=1234` in `.env` before the first start.
 
+Each parent changes only their own PIN and details; parents set the children's PINs. Logins from before an update to
+this rule may show "Log in again to change this" once: managing needs a second cookie that only the hub gets.
+
+### Forgot PIN: reset by e-mail
+
+With these in `.env`, the login screen offers **Forgot PIN?** for people with an e-mail address. The hub mails a link
+that works once, for 30 minutes, at home only:
+
+- `RESEND_API_KEY`: an API key from [Resend](https://resend.com) (the same account as family-job-tracking's reminders
+  works), allowed to send from your domain;
+- `MAIL_FROM`: the sender, e.g. `Familien-Hub <hub@<domain>>`;
+- `HUB_PUBLIC_URL`: the hub's address at home, `https://home.local.<domain>`.
+
+Without all three, there's no **Forgot PIN?**. The last resort, also for people without an address, is a link printed
+on the NAS:
+
+```bash
+sudo docker exec hub-backend python -m app.reset_pin <name>
+```
+
 ### From outside: Cloudflare Tunnel and Access
+
+**Only through the Cloudflare tunnel, never a port forward.** The hub tells home from outside by the header
+`Cf-Connecting-Ip`, which Cloudflare sets on everything through the tunnel. A router port forward to the NAS or the DSM
+reverse proxy brings requests without it: they would count as at home, with the PIN login and managing people.
 
 Same setup as the other apps' outside access (family-job-tracking's README_DOCKER.md). Cloudflare renames dashboard
 menus from time to time.
