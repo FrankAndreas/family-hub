@@ -1,5 +1,7 @@
 """Logging in at home, logging out, and who one is."""
 
+import threading
+
 from fastapi import APIRouter, Depends, Request, Response
 from sqlalchemy.orm import Session
 
@@ -120,11 +122,13 @@ def add_person(body: schemas.PersonIn, db: Session = Depends(get_db)):
     return person_out(person)
 
 
-@router.patch("/people/{person_id}", response_model=schemas.PersonOut, dependencies=[Depends(auth.require_parent)])
-def change_person(person_id: int, body: schemas.PersonPatch, db: Session = Depends(get_db)):
-    person = _get(db, person_id)
-    fields = body.model_fields_set
-    _check_free(db, body.name if "name" in fields else None, body.email if "email" in fields else None, person.id)
+# One change of parents at a time: the "last parent" check reads the others, and two parents making themselves children
+# at once would both pass it. The backend is one process, so a lock in memory is enough
+_parents_lock = threading.Lock()
+
+
+def _check_last_parent(db: Session, person: models.Person, body: schemas.PersonPatch) -> None:
+    """The family keeps an active parent: the last one can't become a child or inactive."""
     stays_parent = (body.role or person.role) == models.Role.PARENT and (
         person.active if body.active is None else body.active
     )
@@ -134,27 +138,64 @@ def change_person(person_id: int, body: schemas.PersonPatch, db: Session = Depen
         )
         if others.count() == 0:
             raise api_error(400, "last_parent")
-    if body.name is not None:
-        person.name, person.name_key = body.name.strip(), auth.name_key(body.name)
-    if "email" in fields:
-        person.email = body.email.strip().casefold() if body.email else None
-    if body.role is not None:
-        person.role = body.role
-    if body.active is not None and body.active != person.active:
-        person.active = body.active
-        # Deactivated: every app hears the logins are over
-        person.token_version += 1
-    if "color" in fields:
-        person.color = body.color
-    if "language" in fields:
-        person.language = body.language
-    db.commit()
+
+
+def _not_another_parent(actor: models.Person, person: models.Person) -> None:
+    """A parent changes the children and themselves, never another parent (spec 2026-10-30 hub hardening): between
+    separated parents, one must not take over the other's account."""
+    if person.role == models.Role.PARENT and person.id != actor.id:
+        raise api_error(403, "other_parent")
+
+
+@router.patch("/people/{person_id}", response_model=schemas.PersonOut)
+def change_person(
+    person_id: int,
+    body: schemas.PersonPatch,
+    actor: models.Person = Depends(auth.require_parent),
+    db: Session = Depends(get_db),
+):
+    person = _get(db, person_id)
+    _not_another_parent(actor, person)
+    fields = body.model_fields_set
+    new_email = (body.email.strip().casefold() if body.email else None) if "email" in fields else person.email
+    if person.id == actor.id and new_email != person.email:
+        # The address is the way back in when the PIN is forgotten: a browser left logged in isn't enough to change it
+        if not body.current_pin:
+            raise api_error(400, "pin_needed")
+        auth.check_pin(db, actor, body.current_pin, api_error(401, "wrong_pin"))
+    _check_free(db, body.name if "name" in fields else None, body.email if "email" in fields else None, person.id)
+    with _parents_lock:
+        # What other requests saved meanwhile
+        db.refresh(person)
+        _check_last_parent(db, person, body)
+        if body.name is not None:
+            person.name, person.name_key = body.name.strip(), auth.name_key(body.name)
+        if "email" in fields:
+            person.email = new_email
+        if body.role is not None:
+            person.role = body.role
+        if body.active is not None and body.active != person.active:
+            person.active = body.active
+            # Deactivated: every app hears the logins are over
+            person.token_version += 1
+        if "color" in fields:
+            person.color = body.color
+        if "language" in fields:
+            person.language = body.language
+        db.commit()
     return person_out(person)
 
 
-@router.put("/people/{person_id}/pin", dependencies=[Depends(auth.require_parent)])
-def set_pin(person_id: int, body: schemas.PinIn, db: Session = Depends(get_db)):
-    _new_pin(_get(db, person_id), body.pin)
+@router.put("/people/{person_id}/pin")
+def set_pin(
+    person_id: int,
+    body: schemas.PinIn,
+    actor: models.Person = Depends(auth.require_parent),
+    db: Session = Depends(get_db),
+):
+    person = _get(db, person_id)
+    _not_another_parent(actor, person)
+    _new_pin(person, body.pin)
     db.commit()
     return {"ok": True}
 
