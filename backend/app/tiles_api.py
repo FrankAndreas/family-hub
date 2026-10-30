@@ -37,8 +37,8 @@ def _check_key(db: Session, key: str | None, tile_id: int | None = None) -> None
         raise api_error(409, "app_key_taken")
 
 
-@router.get("/tiles", dependencies=[Depends(auth.current_person)])
-def tiles(request: Request, db: Session = Depends(get_db)):
+@router.get("/tiles")
+def tiles(request: Request, person: models.Person = Depends(auth.current_person), db: Session = Depends(get_db)):
     outside = auth.through_tunnel(request)
     return [
         {
@@ -49,7 +49,8 @@ def tiles(request: Request, db: Session = Depends(get_db)):
             "home_only": t.remote_url is None,
         }
         for t in _ordered(db)
-        if not outside or t.remote_url
+        # Outside only apps with an outside address; an app with a key only for the people who may use it
+        if (not outside or t.remote_url) and (t.app_key is None or person in t.people)
     ]
 
 

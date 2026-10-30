@@ -73,3 +73,19 @@ def test_session_invalid(client, db):
     db.commit()
     assert client.get("/api/session", headers=bearer(token)).json()["valid"] is False
     assert client.get("/api/session").json() == {"valid": False, "person": None}
+
+
+def test_session_access_per_app(client, db):
+    lena = make_person(db, "Lena")
+    tile = models.Tile(name="Budget", local_url="https://budget.local.example.ch", app_key="budget")
+    db.add(tile)
+    db.commit()
+    headers = bearer(auth.issue_token(lena))
+    # The login is valid either way; access says whether this app is hers
+    found = client.get("/api/session", params={"app": "budget"}, headers=headers).json()
+    assert (found["valid"], found["access"]) == (True, False)
+    tile.people.append(lena)
+    db.commit()
+    assert client.get("/api/session", params={"app": "budget"}, headers=headers).json()["access"] is True
+    assert client.get("/api/session", params={"app": "nope"}, headers=headers).json()["access"] is False
+    assert "access" not in client.get("/api/session", headers=headers).json()

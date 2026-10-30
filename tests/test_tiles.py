@@ -98,3 +98,16 @@ def test_access_unknown_person(client):
     response = client.post("/api/tiles", json={**BUDGET, "app_key": "budget", "people": [9999]})
     assert response.status_code == 400
     assert response.json()["detail"] == "person_not_found"
+
+
+def test_start_page_shows_own_apps(client):
+    login(client)
+    admin_id = client.get("/api/me").json()["id"]
+    add_person(client, "Lena")
+    add(client, {**BUDGET, "app_key": "budget", "people": [admin_id]})
+    add(client, MEALS)
+    assert [t["name"] for t in client.get("/api/tiles").json()] == ["Budget", "Essen"]
+    client.post("/api/logout")
+    login(client, "Lena", "5678")
+    # A keyed app only for the people on its list; a plain link for everyone
+    assert [t["name"] for t in client.get("/api/tiles").json()] == ["Essen"]

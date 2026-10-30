@@ -31,12 +31,11 @@ def session_person(person: models.Person) -> dict:
     }
 
 
-@router.get("/api/session")
-def session(
+def caller(
     request: Request,
     credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
     db: Session = Depends(get_db),
-):
+) -> models.Person | None:
     """The login as an app passes it: the hub login (Bearer) at home, or the Cloudflare Access token (as Cloudflare
     sent it, Cf-Access-Jwt-Assertion) from outside; else the browser's own login."""
     if auth.through_tunnel(request):
@@ -49,6 +48,25 @@ def session(
         person = cloudflare.person_for(request, db)
     else:
         person = auth.current_person_or_none(request, db)
+    return person
+
+
+def has_access(db: Session, person: models.Person, app_key: str) -> bool:
+    tile = db.query(models.Tile).filter(models.Tile.app_key == app_key).first()
+    return tile is not None and person in tile.people
+
+
+@router.get("/api/session")
+def session(
+    app: str | None = None,
+    person: models.Person | None = Depends(caller),
+    db: Session = Depends(get_db),
+):
+    """Whether a login still counts; with ?app=<key> also whether the person may use that app. `valid` stays about the
+    login, so an app can tell "not logged in" (send to the hub) from "no access" (say so) without a loop."""
     if person is None:
         return {"valid": False, "person": None}
-    return {"valid": True, "person": session_person(person)}
+    found: dict = {"valid": True, "person": session_person(person)}
+    if app is not None:
+        found["access"] = has_access(db, person, app)
+    return found
