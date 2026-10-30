@@ -62,7 +62,8 @@ Log in as `Admin`, then in **Einstellungen**:
 - change the PIN and rename Admin;
 - add the family under **Personen**, with e-mail addresses for whoever logs in from outside;
 - add the apps under **Apps**: home address (`https://budget.local.<domain>`), and an outside address only for apps
-  with a tunnel route.
+  with a tunnel route. An app that uses the family login also gets its **app key** (as in the app's own guide, e.g.
+  `budget`) and the people who may use it: only they see its tile and get in.
 
 To choose the first PIN yourself, set `INITIAL_ADMIN_PIN=1234` in `.env` before the first start.
 

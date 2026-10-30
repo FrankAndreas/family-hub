@@ -53,3 +53,35 @@ test('back to the app after logging in', async ({ page }) => {
     // Not an app of the family: stays on the start page
     await expect(page.getByRole('heading', { name: 'Hello Admin' })).toBeVisible();
 });
+
+// An app that uses the family login shows only for the people allowed to use it
+test('access per app', async ({ page }) => {
+    await logIn(page, 'Admin', ADMIN_PIN);
+    await page.getByRole('link', { name: 'Settings' }).click();
+
+    const mia = uniqueName('Mia');
+    await page.getByRole('button', { name: '+ Add person' }).click();
+    await page.getByLabel('Name', { exact: true }).fill(mia);
+    await page.getByLabel('PIN of the person', { exact: true }).fill('1357');
+    await page.getByRole('button', { name: 'Save person' }).click();
+    await expect(page.getByRole('listitem').filter({ hasText: mia })).toBeVisible();
+
+    const app = uniqueName('Geld');
+    await page.getByRole('button', { name: '+ Add app' }).click();
+    await page.getByLabel('App name', { exact: true }).fill(app);
+    await page.getByLabel('Address at home', { exact: true }).fill('https://geld.local.example.ch');
+    await page.getByLabel('App key', { exact: true }).fill(`k${Math.random().toString(36).slice(2, 8).replace(/[^a-z]/g, 'x')}`);
+    const who = page.getByRole('group', { name: 'Who may use it' });
+    await who.getByLabel('Admin', { exact: true }).check();
+    await page.getByRole('button', { name: 'Save app' }).click();
+    await expect(page.getByRole('listitem').filter({ hasText: app })).toContainText('1 person');
+
+    await page.getByRole('button', { name: 'Log out', exact: true }).click();
+    await expect(page.getByRole('heading', { name: 'Who are you?' })).toBeVisible();
+    await logIn(page, mia, '1357');
+    await expect(page.getByRole('link', { name: new RegExp(app) })).toHaveCount(0);
+    await page.getByRole('button', { name: 'Log out', exact: true }).click();
+    await expect(page.getByRole('heading', { name: 'Who are you?' })).toBeVisible();
+    await logIn(page, 'Admin', ADMIN_PIN);
+    await expect(page.getByRole('link', { name: new RegExp(app) })).toBeVisible();
+});

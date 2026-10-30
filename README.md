@@ -33,7 +33,17 @@ An app that switches to the hub drops its own PINs and asks the hub who is logge
 - Neither header nor cookie belongs in an app's logs: each is a login to the hub, a parent's with full rights.
 
 The answer is `{"valid": true, "person": {"id", "name", "email", "role", "color", "language"}}` or
-`{"valid": false, "person": null}`. Cache it for a minute or so. Logging out everywhere, a new PIN and deactivating a
+`{"valid": false, "person": null}`. Cache it for a minute or so.
+
+**Access per app.** In Einstellungen → Apps, an app that uses the family login gets a key (e.g. `budget`) and the
+people who may use it; only they see its tile. The app asks `GET <hub>/api/session?app=<key>`: the answer adds
+`"access": true|false`. `valid` stays about the login, so the app tells "not logged in" (send to the hub) from "no
+access" (say so; sending them to the hub would bring them straight back, again and again).
+
+**The app's people.** `GET <hub>/api/apps/<key>/people`, asked with the same login as `/api/session`, lists the active
+people with access: `[{"id", "name", "role", "color", "language"}]` (no e-mail). 403 when the person asking has no
+access, 404 for an unknown key. The app keeps its own copy keyed by `id`, refreshes it now and then, and hides people
+who left the list instead of deleting their data. Logging out everywhere, a new PIN and deactivating a
 person all end a login. The app keeps its own data per person under the hub's `person.id`.
 
 The hub's tokens are EdDSA JWTs (`iss` `family-hub`, `sub` the person's id). An app may also check their signature

@@ -17,4 +17,8 @@ export interface Person {
 export interface Tile { id: number; name: string; icon: string; url: string; home_only: boolean }
 
 // For parents editing: both addresses
-export interface TileFull { id: number; name: string; icon: string; local_url: string; remote_url: string | null; position: number }
+export interface TileFull {
+    id: number; name: string; icon: string; local_url: string; remote_url: string | null; position: number;
+    // Apps that use the family login: their key, and the ids of the people who may use them
+    app_key: string | null; people: number[];
+}

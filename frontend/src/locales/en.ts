@@ -64,6 +64,11 @@ const en: typeof de = {
         editOf: 'Edit {{name}}',
         deleteOf: 'Delete {{name}}',
         confirmDelete: 'Remove "{{name}}" from the start page?',
+        appKey: 'App key',
+        appKeyHint: 'only for apps that use the family login, e.g. budget',
+        who: 'Who may use it',
+        peopleCount_one: '{{count}} person',
+        peopleCount_other: '{{count}} people',
     },
     errors: {
         generic: 'Something went wrong.',
@@ -80,6 +85,7 @@ const en: typeof de = {
         last_parent: 'At least one active parent must stay.',
         person_not_found: 'Person not found.',
         tile_not_found: 'App not found.',
+        app_key_taken: 'Another app already has this key.',
         tile_order_incomplete: 'The order is incomplete.',
     },
 };
