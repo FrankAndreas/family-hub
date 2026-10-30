@@ -15,7 +15,8 @@ same stack and look. German by default, English per person.
   before isn't locked by wrong PINs from other devices, so nobody at home can lock a parent out; its own wrong PINs
   count against it alone, and after 5 it is a device like any other.
 - **Own PIN only**: each parent changes their own PIN and details and the children's; never another parent's. A
-  forgotten PIN is reset with a link to the person's e-mail address, or from the NAS as the last resort.
+  forgotten PIN is reset with a link to the person's e-mail address, or from the NAS as the last resort. An address
+  counts only once the link mailed to it was opened, so nobody can hand someone else's address to a family member.
 - **Managing happens at home**: people, PINs and apps can't be changed from outside, so a mailbox someone broke into
   (past Cloudflare Access) can't take over the family's accounts.
 - **Start page**: at home every app, linking to its home address; outside only the apps with an outside address. An

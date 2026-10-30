@@ -4,6 +4,7 @@ import Layout from './components/Layout';
 import Login from './pages/Login';
 import Logout from './pages/Logout';
 import ResetPin from './pages/ResetPin';
+import ConfirmEmail from './pages/ConfirmEmail';
 import Settings from './pages/Settings';
 import Start from './pages/Start';
 
@@ -31,6 +32,7 @@ export default function App() {
                     {/* Logged in or not: the apps' "Log out", and the link from the "Forgot PIN" mail */}
                     <Route path="/logout" element={<Logout />} />
                     <Route path="/reset-pin" element={<ResetPin />} />
+                    <Route path="/confirm-email" element={<ConfirmEmail />} />
                     <Route path="*" element={<Pages />} />
                 </Routes>
             </AuthProvider>

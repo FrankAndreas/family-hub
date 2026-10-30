@@ -2,11 +2,20 @@
 
 from helpers import THROUGH_TUNNEL, add_person, login
 
+from app import models
+
 
 def test_parents_add_and_list(client):
     login(client)
     lena = add_person(client, "Lena", email="Lena@Example.ch", color="#f59e0b")
-    assert (lena["email"], lena["role"], lena["active"], lena["color"]) == ("lena@example.ch", "CHILD", True, "#f59e0b")
+    # The address counts once confirmed (security review 2026-10-30); until then it waits
+    assert (lena["email_pending"], lena["role"], lena["active"], lena["color"]) == (
+        "lena@example.ch",
+        "CHILD",
+        True,
+        "#f59e0b",
+    )
+    assert lena["email"] is None
     assert [p["name"] for p in client.get("/api/people").json()] == ["Admin", "Lena"]
     # Lena can log in with her PIN, but can't manage people
     client.post("/api/logout")
@@ -15,9 +24,13 @@ def test_parents_add_and_list(client):
     assert client.post("/api/people", json={"name": "Tim", "pin": "1111", "role": "CHILD"}).status_code == 403
 
 
-def test_unique_names_and_emails(client):
+def test_unique_names_and_emails(client, db):
     login(client)
-    add_person(client, "Lena", email="lena@example.ch")
+    lena = add_person(client, "Lena", email="lena@example.ch")
+    # Confirmed (security review 2026-10-30): from now on the address is Lena's
+    person = db.get(models.Person, lena["id"])
+    person.email, person.email_pending = person.email_pending, None
+    db.commit()
     taken = client.post("/api/people", json={"name": " lena ", "pin": "1111", "role": "CHILD"})
     assert taken.status_code == 409 and taken.json()["detail"] == "name_taken"
     taken = client.post("/api/people", json={"name": "Tim", "pin": "1111", "role": "CHILD", "email": "LENA@example.ch"})
@@ -31,7 +44,7 @@ def test_edit_and_deactivate(client):
     login(client)
     lena = add_person(client, "Lena")
     changed = client.patch(f"/api/people/{lena['id']}", json={"name": "Lena M.", "email": "lena@example.ch"}).json()
-    assert (changed["name"], changed["email"]) == ("Lena M.", "lena@example.ch")
+    assert (changed["name"], changed["email_pending"]) == ("Lena M.", "lena@example.ch")
     client.patch(f"/api/people/{lena['id']}", json={"email": None})
     assert client.get("/api/people").json()[1]["email"] is None
     assert client.patch(f"/api/people/{lena['id']}", json={"active": False}).json()["active"] is False

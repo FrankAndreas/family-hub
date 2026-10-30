@@ -27,6 +27,7 @@ const en: typeof de = {
         done: 'PIN changed. Every login has ended; log in with the new PIN.',
         toLogin: 'To the login',
     },
+    confirmEmail: { title: 'E-mail address', done: 'Address confirmed. It counts from now on.', toStart: 'To the family hub' },
     loginAgain: { button: 'Log in again' },
     start: {
         hello: 'Hello {{name}}',
@@ -47,6 +48,7 @@ const en: typeof de = {
         title: 'People',
         intro: "The family's people, for every app. With the e-mail address one signs in at Cloudflare from outside.",
         currentPinForEmail: 'Your current PIN (to change your e-mail address)',
+        pendingEmail: '{{email}} (waiting for confirmation)',
         add: '+ Add person',
         name: 'Name',
         email: 'E-mail',
@@ -94,6 +96,7 @@ const en: typeof de = {
         login_at_home_only: 'The PIN login is only available at home.',
         not_logged_in: 'Not logged in.',
         login_again: 'Log in again to change this.',
+        email_link_invalid: 'This link has expired or was used already. Save the address again for a new one.',
         other_parent: 'Each parent changes only their own details.',
         pin_needed: 'Enter your current PIN to change your e-mail address.',
         reset_link_invalid: 'This link has expired. Ask for a new one.',

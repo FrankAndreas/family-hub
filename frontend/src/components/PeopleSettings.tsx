@@ -35,9 +35,10 @@ export default function PeopleSettings() {
             if (form.id === null) {
                 await api.post('/api/people', { ...body, pin: form.pin });
             } else {
+                // The PIN first: a child made a parent in this same save is then another parent, whose PIN no one else sets
+                if (form.pin) await api.put(`/api/people/${form.id}/pin`, { pin: form.pin });
                 const own = form.id === me?.id && body.email !== (form.oldEmail || null);
                 await api.patch(`/api/people/${form.id}`, { ...body, active: form.active, ...(own ? { current_pin: form.currentPin } : {}) });
-                if (form.pin) await api.put(`/api/people/${form.id}/pin`, { pin: form.pin });
             }
             setForm(null);
             setError('');
@@ -48,7 +49,7 @@ export default function PeopleSettings() {
     };
 
     const edit = (p: Person) =>
-        setForm({ id: p.id, name: p.name, email: p.email ?? '', role: p.role, color: p.color ?? '#64748b', active: p.active, pin: '', oldEmail: p.email ?? '', currentPin: '' });
+        setForm({ id: p.id, name: p.name, email: p.email_pending ?? p.email ?? '', role: p.role, color: p.color ?? '#64748b', active: p.active, pin: '', oldEmail: p.email_pending ?? p.email ?? '', currentPin: '' });
     const editingSelf = form !== null && form.id !== null && form.id === me?.id;
     const emailChanged = editingSelf && form.email.trim() !== form.oldEmail;
     // Other parents are read-only: each parent changes only themselves and the children
@@ -107,6 +108,9 @@ export default function PeopleSettings() {
                         <span className={`min-w-0 break-words font-medium ${p.active ? '' : 'text-slate-500 line-through'}`}>{p.name}</span>
                         <span className="text-sm text-slate-400">{t(`people.roles.${p.role}`)}</span>
                         {p.email && <span className="min-w-0 break-all text-sm text-slate-500">{p.email}</span>}
+                        {p.email_pending && (
+                            <span className="min-w-0 break-all text-sm text-amber-300">{t('people.pendingEmail', { email: p.email_pending })}</span>
+                        )}
                         {(p.role !== 'PARENT' || p.id === me?.id) && (
                             <button type="button" className="ml-auto text-sm text-blue-300 hover:underline" onClick={() => edit(p)}
                                 aria-label={t('people.editOf', { name: p.name })}>{t('common.edit')}</button>

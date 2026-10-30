@@ -51,7 +51,10 @@ def with_email(db, name=ADMIN, email="admin@example.org"):
 
 
 def ask(client, name=ADMIN):
-    return client.post("/api/pin-reset", json={"name": name})
+    response = client.post("/api/pin-reset", json={"name": name})
+    # The mail goes out after the answer
+    pin_reset.flush()
+    return response
 
 
 def confirm(client, token, pin="2468"):
