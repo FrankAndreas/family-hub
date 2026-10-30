@@ -63,3 +63,51 @@ def test_addresses_must_be_https(client):
         assert client.post("/api/tiles", json={**BUDGET, "local_url": bad}).status_code == 422, bad
     # A development address on this machine
     add(client, {**BUDGET, "local_url": "http://localhost:5173"})
+
+
+# An app that uses the family login has a key; its people are the ones who may use it (spec 2026-10-30, part A)
+def test_tile_keeps_key_and_people(client):
+    login(client)
+    lena = add_person(client, "Lena")
+    tile = add(client, {**BUDGET, "app_key": "budget", "people": [lena["id"]]})
+    managed = client.get("/api/tiles/manage").json()[0]
+    assert (managed["app_key"], managed["people"]) == ("budget", [lena["id"]])
+    assert client.patch(f"/api/tiles/{tile['id']}", json={"people": []}).json()["people"] == []
+    assert client.patch(f"/api/tiles/{tile['id']}", json={"app_key": None}).json()["app_key"] is None
+
+
+def test_app_key_unique(client):
+    login(client)
+    add(client, {**BUDGET, "app_key": "budget"})
+    response = client.post("/api/tiles", json={**MEALS, "app_key": "budget"})
+    assert response.status_code == 409
+    assert response.json()["detail"] == "app_key_taken"
+    assert len(client.get("/api/tiles/manage").json()) == 1
+    meals = add(client, MEALS)
+    assert client.patch(f"/api/tiles/{meals['id']}", json={"app_key": "budget"}).status_code == 409
+
+
+def test_app_key_format(client):
+    login(client)
+    for bad in ("Budget", "b", "budget app", "1budget"):
+        assert client.post("/api/tiles", json={**BUDGET, "app_key": bad}).status_code == 422, bad
+
+
+def test_access_unknown_person(client):
+    login(client)
+    response = client.post("/api/tiles", json={**BUDGET, "app_key": "budget", "people": [9999]})
+    assert response.status_code == 400
+    assert response.json()["detail"] == "person_not_found"
+
+
+def test_start_page_shows_own_apps(client):
+    login(client)
+    admin_id = client.get("/api/me").json()["id"]
+    add_person(client, "Lena")
+    add(client, {**BUDGET, "app_key": "budget", "people": [admin_id]})
+    add(client, MEALS)
+    assert [t["name"] for t in client.get("/api/tiles").json()] == ["Budget", "Essen"]
+    client.post("/api/logout")
+    login(client, "Lena", "5678")
+    # A keyed app only for the people on its list; a plain link for everyone
+    assert [t["name"] for t in client.get("/api/tiles").json()] == ["Essen"]

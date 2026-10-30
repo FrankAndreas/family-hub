@@ -62,6 +62,11 @@ const de = {
         editOf: '{{name}} bearbeiten',
         deleteOf: '{{name}} löschen',
         confirmDelete: '«{{name}}» von der Startseite entfernen?',
+        appKey: 'App-Schlüssel',
+        appKeyHint: 'nur für Apps mit dem Familien-Login, z. B. budget',
+        who: 'Wer darf sie nutzen',
+        peopleCount_one: '{{count}} Person',
+        peopleCount_other: '{{count}} Personen',
     },
     errors: {
         generic: 'Etwas ist schiefgegangen.',
@@ -78,6 +83,7 @@ const de = {
         last_parent: 'Mindestens ein aktiver Elternteil muss bleiben.',
         person_not_found: 'Person nicht gefunden.',
         tile_not_found: 'App nicht gefunden.',
+        app_key_taken: 'Eine andere App hat schon diesen Schlüssel.',
         tile_order_incomplete: 'Die Reihenfolge ist nicht vollständig.',
     },
 };

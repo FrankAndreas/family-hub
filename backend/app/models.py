@@ -1,8 +1,8 @@
 import enum
 from datetime import datetime
 
-from sqlalchemy import Enum, String
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy import Column, Enum, ForeignKey, String, Table
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .database import Base
 from .timeutil import utcnow
@@ -43,6 +43,15 @@ class Person(Base):
     created_at: Mapped[datetime] = mapped_column(default=utcnow)
 
 
+# Who may use which app (spec 2026-10-30, part A): only tiles with an app key take part
+tile_access = Table(
+    "tile_access",
+    Base.metadata,
+    Column("tile_id", ForeignKey("tiles.id", ondelete="CASCADE"), primary_key=True),
+    Column("person_id", ForeignKey("people.id", ondelete="CASCADE"), primary_key=True),
+)
+
+
 class Tile(Base):
     """An app on the start page: its address at home, and outside (None: home only)."""
 
@@ -55,3 +64,7 @@ class Tile(Base):
     local_url: Mapped[str] = mapped_column(String(300))
     remote_url: Mapped[str | None] = mapped_column(String(300))
     position: Mapped[int] = mapped_column(default=0)
+    # Set for an app that uses the family login, e.g. "budget": it asks the hub for access and its people by this key.
+    # None: a plain link, shown to everyone
+    app_key: Mapped[str | None] = mapped_column(String(20), unique=True)
+    people: Mapped[list[Person]] = relationship(secondary=tile_access, order_by=Person.id)
