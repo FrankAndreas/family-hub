@@ -5,8 +5,10 @@ it and the addresses through Cloudflare never do. A request that came through th
 Cf-Connecting-Ip) gets no PIN login and its cookie counts for nothing: outside, only a Cloudflare Access token does.
 """
 
+import hashlib
 import logging
 import math
+import secrets
 import threading
 from datetime import datetime, timedelta, timezone
 
@@ -30,6 +32,14 @@ TOKEN_LIFETIME = timedelta(days=30)
 MAX_FAILED_LOGINS = 5
 LOCK_DURATION = timedelta(minutes=15)
 MAX_LOCK_DURATION = timedelta(days=1)
+# A browser the person logged in with before (security review 2026-10-30): wrong PINs from other devices don't lock it
+DEVICE_COOKIE = "hub_device"
+DEVICE_LIFETIME = timedelta(days=365)
+# Known browsers kept per person; the oldest is forgotten first
+MAX_DEVICES = 20
+# The hub's own pages send it with every change; another page on the family's domain can't make a browser send it
+APP_HEADER = "x-requested-with"
+APP_HEADER_VALUE = "hub"
 # Cloudflare sets it on every request through the tunnel; the DSM reverse proxy at home doesn't
 TUNNEL_HEADER = "cf-connecting-ip"
 
@@ -73,37 +83,98 @@ def _pin_lock(person_id: int) -> threading.Lock:
         return _pin_locks.setdefault(person_id, threading.Lock())
 
 
-def check_pin(db: Session, person: models.Person, pin: str, wrong: Exception) -> None:
-    """The person's PIN, counting wrong ones and locking the person after too many; raises `wrong` or 429."""
+def _secret_hash(secret: str) -> str:
+    return hashlib.sha256(secret.encode()).hexdigest()
+
+
+def known_device(db: Session, person: models.Person, secret: str | None) -> models.KnownDevice | None:
+    if not secret:
+        return None
+    return (
+        db.query(models.KnownDevice)
+        .filter(models.KnownDevice.person_id == person.id, models.KnownDevice.secret_hash == _secret_hash(secret))
+        .first()
+    )
+
+
+def check_pin(db: Session, person: models.Person, pin: str, wrong: Exception, device_secret: str | None = None) -> None:
+    """The person's PIN, counting wrong ones and locking the person after too many; raises `wrong` or 429.
+
+    From a browser the person logged in with before, the lock doesn't apply and wrong PINs count against that browser
+    alone: after MAX_FAILED_LOGINS of them it is unknown again."""
     with _pin_lock(person.id):
         # What other requests counted meanwhile
         db.refresh(person)
+        device = known_device(db, person, device_secret)
         now = utcnow()
-        if person.locked_until and person.locked_until > now:
+        if device is None and person.locked_until and person.locked_until > now:
             minutes = math.ceil((person.locked_until - now).total_seconds() / 60)
             raise api_error(status.HTTP_429_TOO_MANY_REQUESTS, "locked", minutes=minutes)
         if not verify_pin(pin, person.pin_hash):
-            person.failed_logins += 1
-            if person.failed_logins >= MAX_FAILED_LOGINS:
-                person.failed_logins = 0
-                person.lockouts += 1
-                person.locked_until = now + lock_duration(person.lockouts)
+            if device is not None:
+                device.failed_logins += 1
+                if device.failed_logins >= MAX_FAILED_LOGINS:
+                    db.delete(device)
+            else:
+                person.failed_logins += 1
+                if person.failed_logins >= MAX_FAILED_LOGINS:
+                    person.failed_logins = 0
+                    person.lockouts += 1
+                    person.locked_until = now + lock_duration(person.lockouts)
             db.commit()
             raise wrong
+        if device is not None:
+            device.failed_logins = 0
         person.failed_logins = 0
         person.lockouts = 0
         person.locked_until = None
         db.commit()
 
 
-def authenticate(db: Session, name: str, pin: str) -> models.Person:
+def authenticate(db: Session, name: str, pin: str, device_secret: str | None = None) -> models.Person:
     """The active person with this name and PIN; counts wrong PINs and locks the person after too many."""
     wrong = api_error(status.HTTP_401_UNAUTHORIZED, "wrong_name_or_pin")
     person = db.query(models.Person).filter(models.Person.name_key == name_key(name)).first()
     if person is None or not person.active:
         raise wrong
-    check_pin(db, person, pin, wrong)
+    check_pin(db, person, pin, wrong, device_secret)
     return person
+
+
+def remember_device(db: Session, response: Response, person: models.Person, secret: str | None) -> None:
+    """After a correct login: this browser is known for the person from now on. Its cookie stays with the hub (no
+    domain), so the other apps at home never get it."""
+    if known_device(db, person, secret) is None:
+        secret = secret or secrets.token_urlsafe(32)
+        db.add(models.KnownDevice(person_id=person.id, secret_hash=_secret_hash(secret)))
+        db.flush()
+        kept = (
+            db.query(models.KnownDevice.id)
+            .filter(models.KnownDevice.person_id == person.id)
+            .order_by(models.KnownDevice.id.desc())
+            .limit(MAX_DEVICES)
+        )
+        db.query(models.KnownDevice).filter(
+            models.KnownDevice.person_id == person.id, models.KnownDevice.id.not_in(kept.scalar_subquery())
+        ).delete(synchronize_session=False)
+        db.commit()
+    assert secret is not None
+    response.set_cookie(
+        DEVICE_COOKIE,
+        secret,
+        max_age=int(DEVICE_LIFETIME.total_seconds()),
+        path="/api",
+        secure=config.env("COOKIE_INSECURE") != "1",
+        httponly=True,
+        samesite="strict",
+    )
+
+
+def require_app_header(request: Request) -> None:
+    """Changes come from the hub's own pages only (security review 2026-10-30). The login cookie is SameSite=lax, so
+    every page on the family's domain (any app at home) could otherwise make a browser send it with a change."""
+    if request.method not in ("GET", "HEAD", "OPTIONS") and request.headers.get(APP_HEADER) != APP_HEADER_VALUE:
+        raise api_error(status.HTTP_403_FORBIDDEN, "csrf")
 
 
 def issue_token(person: models.Person) -> str:

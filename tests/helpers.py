@@ -4,6 +4,8 @@ ADMIN = "Admin"
 ADMIN_PIN = "1234"
 # Cloudflare sets this on every request that comes through the tunnel; the DSM reverse proxy at home doesn't
 THROUGH_TUNNEL = {"Cf-Connecting-Ip": "203.0.113.7"}
+# The hub's own pages send it with every change; another site can't make a browser send it
+APP_HEADER = {"X-Requested-With": "hub"}
 
 
 def login(client, name=ADMIN, pin=ADMIN_PIN):

@@ -4,7 +4,7 @@ import threading
 import time
 
 from fastapi.testclient import TestClient
-from helpers import ADMIN_PIN, THROUGH_TUNNEL, login
+from helpers import ADMIN_PIN, APP_HEADER, THROUGH_TUNNEL, login
 from test_cloudflare import access, outside, token  # noqa: F401
 
 from app import auth, cloudflare, config, keys
@@ -24,7 +24,7 @@ def test_parallel_wrong_pins_count_every_try(monkeypatch):
     codes: list[int] = []
 
     def guess(n):
-        response = TestClient(app).post("/api/login", json={"name": "Admin", "pin": f"{n:04d}"})
+        response = TestClient(app, headers=APP_HEADER).post("/api/login", json={"name": "Admin", "pin": f"{n:04d}"})
         codes.append(response.status_code)
 
     threads = [threading.Thread(target=guess, args=(n,)) for n in range(2000, 2020)]

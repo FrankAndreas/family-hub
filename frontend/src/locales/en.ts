@@ -77,6 +77,7 @@ const en: typeof de = {
         wrong_name_or_pin: 'Wrong name or PIN',
         wrong_pin: "The current PIN isn't right.",
         locked: 'Too many wrong PINs. Try again in {{minutes}} minutes.',
+        csrf: "This change didn't come from the family hub itself. Reload the page.",
         login_at_home_only: 'The PIN login is only available at home.',
         not_logged_in: 'Not logged in.',
         parents_only: 'Parents only.',
