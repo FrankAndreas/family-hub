@@ -11,6 +11,9 @@ same stack and look. German by default, English per person.
 - **From outside** (`*.<domain>` through the Cloudflare Tunnel): Cloudflare Access is the login (e-mail code or
   Google). The hub and the apps know the person by e-mail address. There is no PIN login outside, and the home cookie
   counts for nothing there.
+- **Wrong PINs**: 5 in a row lock the person for 15 minutes, doubling up to a day. A browser the person logged in with
+  before isn't locked by wrong PINs from other devices, so nobody at home can lock a parent out; its own wrong PINs
+  count against it alone, and after 5 it is a device like any other.
 - **Managing happens at home**: people, PINs and apps can't be changed from outside, so a mailbox someone broke into
   (past Cloudflare Access) can't take over the family's accounts.
 - **Start page**: at home every app, linking to its home address; outside only the apps with an outside address. An
@@ -48,6 +51,10 @@ person all end a login. The app keeps its own data per person under the hub's `p
 
 The hub's tokens are EdDSA JWTs (`iss` `family-hub`, `sub` the person's id). An app may also check their signature
 itself with the public key at `<hub>/.well-known/jwks.json`; asking `/api/session` is still what honours a logout.
+
+Apps only read from the hub. Every change (POST, PUT, PATCH, DELETE) needs the header `X-Requested-With: hub`, which
+the hub's own pages send: another page on the family's domain can make a browser send the login cookie, but not this
+header.
 
 Not logged in: send the person to `https://home.local.<domain>/?next=<the app's address>`. After the login the hub
 sends them back, if the address belongs to an app on its start page.

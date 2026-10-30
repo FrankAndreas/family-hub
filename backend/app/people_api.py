@@ -37,8 +37,10 @@ def public_people(db: Session = Depends(get_db)):
 
 
 @router.post("/login", dependencies=[Depends(auth.require_home)])
-def login(body: schemas.LoginIn, response: Response, db: Session = Depends(get_db)):
-    person = auth.authenticate(db, body.name, body.pin)
+def login(body: schemas.LoginIn, request: Request, response: Response, db: Session = Depends(get_db)):
+    device = request.cookies.get(auth.DEVICE_COOKIE)
+    person = auth.authenticate(db, body.name, body.pin, device)
+    auth.remember_device(db, response, person, device)
     auth.set_cookie(response, auth.issue_token(person))
     return person_out(person)
 

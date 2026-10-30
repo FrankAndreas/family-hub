@@ -1,7 +1,7 @@
 import enum
 from datetime import datetime
 
-from sqlalchemy import Column, Enum, ForeignKey, String, Table
+from sqlalchemy import Column, Enum, ForeignKey, String, Table, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .database import Base
@@ -68,3 +68,18 @@ class Tile(Base):
     # None: a plain link, shown to everyone
     app_key: Mapped[str | None] = mapped_column(String(20), unique=True)
     people: Mapped[list[Person]] = relationship(secondary=tile_access, order_by=Person.id)
+
+
+class KnownDevice(Base):
+    """A browser the person logged in with before (security review 2026-10-30): wrong PINs from elsewhere don't lock it,
+    so nobody at home can lock a parent out. Its own wrong PINs count against it alone, and a few make it unknown."""
+
+    __tablename__ = "known_devices"
+    __table_args__ = (UniqueConstraint("person_id", "secret_hash", name="uq_known_devices_person_id"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    person_id: Mapped[int] = mapped_column(ForeignKey("people.id", ondelete="CASCADE"))
+    # SHA-256 of the browser's hub_device cookie; a browser keeps one cookie for everyone who logs in with it
+    secret_hash: Mapped[str] = mapped_column(String(64))
+    failed_logins: Mapped[int] = mapped_column(default=0)
+    created_at: Mapped[datetime] = mapped_column(default=utcnow)

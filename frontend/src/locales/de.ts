@@ -75,6 +75,7 @@ const de = {
         wrong_name_or_pin: 'Name oder PIN falsch',
         wrong_pin: 'Die bisherige PIN stimmt nicht.',
         locked: 'Zu viele falsche PINs. Versuche es in {{minutes}} Minuten wieder.',
+        csrf: 'Diese Änderung kam nicht vom Familien-Hub selbst. Lade die Seite neu.',
         login_at_home_only: 'Die PIN-Anmeldung gibt es nur zu Hause.',
         not_logged_in: 'Nicht angemeldet.',
         parents_only: 'Nur für Eltern.',

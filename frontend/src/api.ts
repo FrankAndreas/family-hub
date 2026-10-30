@@ -1,8 +1,9 @@
 import axios from 'axios';
 import i18n from './i18n';
 
-// Same origin: Vite (dev) or nginx (Docker) forwards /api to the backend, and the login is the page's own cookie
-const api = axios.create({ withCredentials: true });
+// Same origin: Vite (dev) or nginx (Docker) forwards /api to the backend, and the login is the page's own cookie.
+// The backend takes changes only with this header: other pages on the family's domain can't make a browser send it
+const api = axios.create({ withCredentials: true, headers: { 'X-Requested-With': 'hub' } });
 
 // The backend sends a code (errors.<code> in the locales), alone or with the values the text needs
 export function errorMessage(error: unknown): string {
