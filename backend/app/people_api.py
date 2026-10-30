@@ -1,9 +1,11 @@
 """Logging in at home, logging out, and who one is."""
 
+import threading
+
 from fastapi import APIRouter, Depends, Request, Response
 from sqlalchemy.orm import Session
 
-from . import auth, config, models, schemas
+from . import auth, config, models, pin_reset, schemas
 from .database import get_db
 from .errors import api_error
 
@@ -27,7 +29,20 @@ def person_out(person: models.Person, at_home: bool = True) -> schemas.PersonOut
 @router.get("/config")
 def public_config():
     """What the login screen needs before anyone is logged in: the language for browsers that speak neither."""
-    return {"default_language": config.default_language()}
+    return {"default_language": config.default_language(), "pin_reset": pin_reset.is_configured()}
+
+
+@router.post("/pin-reset", dependencies=[Depends(auth.require_home)])
+def ask_pin_reset(body: schemas.PinResetIn, db: Session = Depends(get_db)):
+    """Forgot PIN: a link to the person's address, if any. The same answer whatever the case."""
+    pin_reset.request_reset(db, body.name)
+    return {"ok": True}
+
+
+@router.post("/pin-reset/confirm", dependencies=[Depends(auth.require_home)])
+def confirm_pin_reset(body: schemas.PinResetConfirmIn, db: Session = Depends(get_db)):
+    pin_reset.confirm(db, body.token, body.pin)
+    return {"ok": True}
 
 
 @router.get("/people/public", response_model=list[schemas.PersonPublic], dependencies=[Depends(auth.require_home)])
@@ -41,13 +56,15 @@ def login(body: schemas.LoginIn, request: Request, response: Response, db: Sessi
     device = request.cookies.get(auth.DEVICE_COOKIE)
     person = auth.authenticate(db, body.name, body.pin, device)
     auth.remember_device(db, response, person, device)
-    auth.set_cookie(response, auth.issue_token(person))
+    auth.set_cookies(response, *auth.issue_tokens(person))
     return person_out(person)
 
 
 @router.post("/logout")
-def logout(response: Response):
-    auth.clear_cookie(response)
+def logout(request: Request, response: Response, db: Session = Depends(get_db)):
+    """Ends this login, in the hub and in every app (they ask /api/session); other devices stay logged in."""
+    auth.end_login(db, request.cookies.get(auth.COOKIE))
+    auth.clear_cookies(response)
     return {"ok": True}
 
 
@@ -58,7 +75,7 @@ def logout_everywhere(
     """Ends every login of this person, on every device and in every app."""
     person.token_version += 1
     db.commit()
-    auth.clear_cookie(response)
+    auth.clear_cookies(response)
     return {"ok": True}
 
 
@@ -87,15 +104,6 @@ def _check_free(db: Session, name: str | None, email: str | None, except_id: int
         raise api_error(409, "email_taken")
 
 
-def _new_pin(person: models.Person, pin: str) -> None:
-    """A new PIN ends every login made with the old one and lifts a lock."""
-    person.pin_hash = auth.get_pin_hash(pin)
-    person.token_version += 1
-    person.failed_logins = 0
-    person.lockouts = 0
-    person.locked_until = None
-
-
 @router.get("/people", response_model=list[schemas.PersonOut], dependencies=[Depends(auth.require_parent)])
 def list_people(db: Session = Depends(get_db)):
     return [person_out(p) for p in db.query(models.Person).order_by(models.Person.name_key)]
@@ -118,11 +126,13 @@ def add_person(body: schemas.PersonIn, db: Session = Depends(get_db)):
     return person_out(person)
 
 
-@router.patch("/people/{person_id}", response_model=schemas.PersonOut, dependencies=[Depends(auth.require_parent)])
-def change_person(person_id: int, body: schemas.PersonPatch, db: Session = Depends(get_db)):
-    person = _get(db, person_id)
-    fields = body.model_fields_set
-    _check_free(db, body.name if "name" in fields else None, body.email if "email" in fields else None, person.id)
+# One change of parents at a time: the "last parent" check reads the others, and two parents making themselves children
+# at once would both pass it. The backend is one process, so a lock in memory is enough
+_parents_lock = threading.Lock()
+
+
+def _check_last_parent(db: Session, person: models.Person, body: schemas.PersonPatch) -> None:
+    """The family keeps an active parent: the last one can't become a child or inactive."""
     stays_parent = (body.role or person.role) == models.Role.PARENT and (
         person.active if body.active is None else body.active
     )
@@ -132,44 +142,87 @@ def change_person(person_id: int, body: schemas.PersonPatch, db: Session = Depen
         )
         if others.count() == 0:
             raise api_error(400, "last_parent")
-    if body.name is not None:
-        person.name, person.name_key = body.name.strip(), auth.name_key(body.name)
-    if "email" in fields:
-        person.email = body.email.strip().casefold() if body.email else None
-    if body.role is not None:
-        person.role = body.role
-    if body.active is not None and body.active != person.active:
-        person.active = body.active
-        # Deactivated: every app hears the logins are over
-        person.token_version += 1
-    if "color" in fields:
-        person.color = body.color
-    if "language" in fields:
-        person.language = body.language
-    db.commit()
+
+
+def _not_another_parent(actor: models.Person, person: models.Person) -> None:
+    """A parent changes the children and themselves, never another parent (spec 2026-10-30 hub hardening): between
+    separated parents, one must not take over the other's account."""
+    if person.role == models.Role.PARENT and person.id != actor.id:
+        raise api_error(403, "other_parent")
+
+
+@router.patch("/people/{person_id}", response_model=schemas.PersonOut)
+def change_person(
+    person_id: int,
+    body: schemas.PersonPatch,
+    actor: models.Person = Depends(auth.require_parent),
+    db: Session = Depends(get_db),
+):
+    person = _get(db, person_id)
+    _not_another_parent(actor, person)
+    fields = body.model_fields_set
+    new_email = (body.email.strip().casefold() if body.email else None) if "email" in fields else person.email
+    if person.id == actor.id and new_email != person.email:
+        # The address is the way back in when the PIN is forgotten: a browser left logged in isn't enough to change it
+        if not body.current_pin:
+            raise api_error(400, "pin_needed")
+        auth.check_pin(db, actor, body.current_pin, api_error(401, "wrong_pin"))
+    _check_free(db, body.name if "name" in fields else None, body.email if "email" in fields else None, person.id)
+    with _parents_lock:
+        # What other requests saved meanwhile
+        db.refresh(person)
+        _check_last_parent(db, person, body)
+        if body.name is not None:
+            person.name, person.name_key = body.name.strip(), auth.name_key(body.name)
+        if "email" in fields and new_email != person.email:
+            person.email = new_email
+            # Links sent to the old address stop working (security review 2026-10-30)
+            pin_reset.end_links(db, person)
+        if body.role is not None:
+            person.role = body.role
+        if body.active is not None and body.active != person.active:
+            person.active = body.active
+            # Deactivated: every app hears the logins are over; open reset links end too
+            person.token_version += 1
+            pin_reset.end_links(db, person)
+        if "color" in fields:
+            person.color = body.color
+        if "language" in fields:
+            person.language = body.language
+        db.commit()
     return person_out(person)
 
 
-@router.put("/people/{person_id}/pin", dependencies=[Depends(auth.require_parent)])
-def set_pin(person_id: int, body: schemas.PinIn, db: Session = Depends(get_db)):
-    _new_pin(_get(db, person_id), body.pin)
+@router.put("/people/{person_id}/pin")
+def set_pin(
+    person_id: int,
+    body: schemas.PinIn,
+    actor: models.Person = Depends(auth.require_parent),
+    db: Session = Depends(get_db),
+):
+    person = _get(db, person_id)
+    _not_another_parent(actor, person)
+    if person.id == actor.id:
+        # One's own PIN only with the old one (PUT /me/pin) or a reset link
+        raise api_error(403, "own_pin_needs_old_pin")
+    auth.new_pin(person, body.pin)
     db.commit()
     return {"ok": True}
 
 
-@router.put("/me/pin", dependencies=[Depends(auth.require_manage_at_home)])
+@router.put("/me/pin")
 def set_own_pin(
     body: schemas.OwnPinIn,
     response: Response,
-    person: models.Person = Depends(auth.current_person),
+    person: models.Person = Depends(auth.require_manager),
     db: Session = Depends(get_db),
 ):
     # Counts toward the lock like a login: a session alone doesn't let anyone try PINs
     auth.check_pin(db, person, body.old_pin, api_error(401, "wrong_pin"))
-    _new_pin(person, body.pin)
+    auth.new_pin(person, body.pin)
     db.commit()
     # Other devices are logged out; this one stays
-    auth.set_cookie(response, auth.issue_token(person))
+    auth.set_cookies(response, *auth.issue_tokens(person))
     return {"ok": True}
 
 
@@ -180,6 +233,9 @@ def change_me(
     person: models.Person = Depends(auth.current_person),
     db: Session = Depends(get_db),
 ):
+    # Outside, the Cloudflare login is enough for one's own language and colour; at home it takes the manage cookie
+    if not auth.through_tunnel(request):
+        auth.require_manager(request, person, db)
     fields = body.model_fields_set
     if "language" in fields:
         person.language = body.language

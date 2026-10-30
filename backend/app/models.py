@@ -83,3 +83,25 @@ class KnownDevice(Base):
     secret_hash: Mapped[str] = mapped_column(String(64))
     failed_logins: Mapped[int] = mapped_column(default=0)
     created_at: Mapped[datetime] = mapped_column(default=utcnow)
+
+
+class EndedLogin(Base):
+    """A login ended with "Log out" (spec 2026-10-30 hub hardening): its token's id, kept until the token expires."""
+
+    __tablename__ = "ended_logins"
+
+    jti: Mapped[str] = mapped_column(String(32), primary_key=True)
+    expires_at: Mapped[datetime]
+
+
+class PinReset(Base):
+    """A link to set a forgotten PIN, sent by e-mail or printed on the NAS: only its SHA-256 is kept; it works once."""
+
+    __tablename__ = "pin_resets"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    person_id: Mapped[int] = mapped_column(ForeignKey("people.id", ondelete="CASCADE"))
+    token_hash: Mapped[str] = mapped_column(String(64), unique=True)
+    created_at: Mapped[datetime] = mapped_column(default=utcnow)
+    expires_at: Mapped[datetime]
+    used_at: Mapped[datetime | None]

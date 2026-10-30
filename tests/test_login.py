@@ -85,6 +85,6 @@ def test_names_for_the_login_screen(client, db):
 
 
 def test_config_for_the_login_screen(client, monkeypatch):
-    assert client.get("/api/config").json() == {"default_language": "de"}
+    assert client.get("/api/config").json() == {"default_language": "de", "pin_reset": False}
     monkeypatch.setenv("DEFAULT_LANGUAGE", "en")
-    assert client.get("/api/config").json() == {"default_language": "en"}
+    assert client.get("/api/config").json()["default_language"] == "en"

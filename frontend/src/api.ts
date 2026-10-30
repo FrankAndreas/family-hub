@@ -18,4 +18,13 @@ export function errorMessage(error: unknown): string {
     return i18n.t('errors.generic');
 }
 
+// A change refused because this browser has no manage cookie yet: the layout offers to log in again
+export const LOGIN_AGAIN_EVENT = 'hub:login-again';
+api.interceptors.response.use(undefined, error => {
+    if (axios.isAxiosError(error) && error.response?.status === 403 && error.response.data?.detail === 'login_again') {
+        window.dispatchEvent(new Event(LOGIN_AGAIN_EVENT));
+    }
+    return Promise.reject(error);
+});
+
 export default api;

@@ -2,6 +2,8 @@ import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { AuthProvider, useAuth } from './AuthContext';
 import Layout from './components/Layout';
 import Login from './pages/Login';
+import Logout from './pages/Logout';
+import ResetPin from './pages/ResetPin';
 import Settings from './pages/Settings';
 import Start from './pages/Start';
 
@@ -25,7 +27,12 @@ export default function App() {
     return (
         <BrowserRouter>
             <AuthProvider>
-                <Pages />
+                <Routes>
+                    {/* Logged in or not: the apps' "Log out", and the link from the "Forgot PIN" mail */}
+                    <Route path="/logout" element={<Logout />} />
+                    <Route path="/reset-pin" element={<ResetPin />} />
+                    <Route path="*" element={<Pages />} />
+                </Routes>
             </AuthProvider>
         </BrowserRouter>
     );

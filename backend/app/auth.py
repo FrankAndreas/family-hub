@@ -10,6 +10,7 @@ import logging
 import math
 import secrets
 import threading
+import uuid
 from datetime import datetime, timedelta, timezone
 
 import bcrypt
@@ -24,6 +25,8 @@ from .timeutil import utcnow
 logger = logging.getLogger(__name__)
 
 COOKIE = "hub_session"
+# Only the hub gets it: managing people, PINs and apps needs it as well (spec 2026-10-30 hub hardening)
+MANAGE_COOKIE = "hub_manage"
 ISSUER = "family-hub"
 ALGORITHM = "EdDSA"
 TOKEN_LIFETIME = timedelta(days=30)
@@ -81,6 +84,15 @@ _pin_locks_guard = threading.Lock()
 def _pin_lock(person_id: int) -> threading.Lock:
     with _pin_locks_guard:
         return _pin_locks.setdefault(person_id, threading.Lock())
+
+
+def new_pin(person: models.Person, pin: str) -> None:
+    """A new PIN ends every login made with the old one and lifts a lock."""
+    person.pin_hash = get_pin_hash(pin)
+    person.token_version += 1
+    person.failed_logins = 0
+    person.lockouts = 0
+    person.locked_until = None
 
 
 def _secret_hash(secret: str) -> str:
@@ -177,26 +189,42 @@ def require_app_header(request: Request) -> None:
         raise api_error(status.HTTP_403_FORBIDDEN, "csrf")
 
 
-def issue_token(person: models.Person) -> str:
+def issue_tokens(person: models.Person) -> tuple[str, str]:
+    """A login: the session token every app at home gets, and the manage token only the hub gets (spec 2026-10-30 hub
+    hardening). The session's id (jti) lets "Log out" end exactly this login; the manage token names it (sid)."""
     key, kid = keys.signing_key()
-    claims = {
+    common = {
         "iss": ISSUER,
         "sub": str(person.id),
         "ver": person.token_version,
         "exp": datetime.now(timezone.utc) + TOKEN_LIFETIME,
     }
-    return jwt.encode(claims, key, algorithm=ALGORITHM, headers={"kid": kid})
+    jti = uuid.uuid4().hex
+    session = jwt.encode({**common, "typ": "session", "jti": jti}, key, algorithm=ALGORITHM, headers={"kid": kid})
+    manage = jwt.encode({**common, "typ": "manage", "sid": jti}, key, algorithm=ALGORITHM, headers={"kid": kid})
+    return session, manage
 
 
-def person_for_token(db: Session, token: str | None) -> models.Person | None:
-    """The person a hub token names, if it is ours, not expired, not ended (token_version) and the person is active."""
+def token_claims(token: str | None, typ: str) -> dict | None:
+    """The claims of a hub token of this type, if it is ours and not expired; any other token is None."""
     if not token:
         return None
     key, _ = keys.signing_key()
     try:
         claims = jwt.decode(token, key.public_key(), algorithms=[ALGORITHM], issuer=ISSUER)
+    except jwt.PyJWTError:
+        return None
+    return claims if claims.get("typ") == typ else None
+
+
+def _ended(db: Session, jti: object) -> bool:
+    return not isinstance(jti, str) or db.get(models.EndedLogin, jti) is not None
+
+
+def _person(db: Session, claims: dict) -> models.Person | None:
+    try:
         person_id, version = int(claims["sub"]), int(claims["ver"])
-    except jwt.PyJWTError, KeyError, ValueError, TypeError:
+    except KeyError, ValueError, TypeError:
         return None
     person = db.get(models.Person, person_id)
     if person is None or not person.active or person.token_version != version:
@@ -204,26 +232,54 @@ def person_for_token(db: Session, token: str | None) -> models.Person | None:
     return person
 
 
-def set_cookie(response: Response, token: str) -> None:
+def person_for_token(db: Session, token: str | None) -> models.Person | None:
+    """The person a session token names, if it is ours, not expired, not logged out, not ended everywhere
+    (token_version) and the person is active."""
+    claims = token_claims(token, "session")
+    if claims is None or _ended(db, claims.get("jti")):
+        return None
+    return _person(db, claims)
+
+
+def end_login(db: Session, token: str | None) -> None:
+    """ "Log out": this session token is no login any more, here or in any app. Ended logins that would have expired
+    by now are dropped."""
+    now = utcnow()
+    db.query(models.EndedLogin).filter(models.EndedLogin.expires_at < now).delete()
+    claims = token_claims(token, "session")
+    jti = claims.get("jti") if claims else None
+    if isinstance(jti, str) and db.get(models.EndedLogin, jti) is None:
+        expires = datetime.fromtimestamp(int(claims["exp"]), timezone.utc).replace(tzinfo=None)  # type: ignore[index]
+        db.add(models.EndedLogin(jti=jti, expires_at=expires))
+    db.commit()
+
+
+def _secure() -> bool:
+    return config.env("COOKIE_INSECURE") != "1"
+
+
+def set_cookies(response: Response, session: str, manage: str) -> None:
+    """The session cookie for every app at home (COOKIE_DOMAIN); the manage cookie for the hub alone (no domain)."""
+    max_age = int(TOKEN_LIFETIME.total_seconds())
     response.set_cookie(
         COOKIE,
-        token,
-        max_age=int(TOKEN_LIFETIME.total_seconds()),
+        session,
+        max_age=max_age,
         domain=config.env("COOKIE_DOMAIN") or None,
-        secure=config.env("COOKIE_INSECURE") != "1",
+        secure=_secure(),
         httponly=True,
         samesite="lax",
     )
+    response.set_cookie(
+        MANAGE_COOKIE, manage, max_age=max_age, path="/api", secure=_secure(), httponly=True, samesite="strict"
+    )
 
 
-def clear_cookie(response: Response) -> None:
+def clear_cookies(response: Response) -> None:
     response.delete_cookie(
-        COOKIE,
-        domain=config.env("COOKIE_DOMAIN") or None,
-        secure=config.env("COOKIE_INSECURE") != "1",
-        httponly=True,
-        samesite="lax",
+        COOKIE, domain=config.env("COOKIE_DOMAIN") or None, secure=_secure(), httponly=True, samesite="lax"
     )
+    response.delete_cookie(MANAGE_COOKIE, path="/api", secure=_secure(), httponly=True, samesite="strict")
 
 
 def current_person_or_none(request: Request, db: Session) -> models.Person | None:
@@ -247,11 +303,26 @@ def require_manage_at_home(request: Request) -> None:
         raise api_error(status.HTTP_403_FORBIDDEN, "manage_at_home_only")
 
 
-def require_parent(request: Request, person: models.Person = Depends(current_person)) -> models.Person:
-    """A parent, at home: every parent right is about managing the family."""
+def require_manager(
+    request: Request, person: models.Person = Depends(current_person), db: Session = Depends(database.get_db)
+) -> models.Person:
+    """Whoever changes something in the hub, at home, with the manage cookie of this very login (spec 2026-10-30 hub
+    hardening): the session cookie alone, which every app at home gets, manages nothing."""
+    require_manage_at_home(request)
+    session = token_claims(request.cookies.get(COOKIE), "session")
+    manage = token_claims(request.cookies.get(MANAGE_COOKIE), "manage")
+    if session is None or manage is None or manage.get("sid") != session.get("jti"):
+        raise api_error(status.HTTP_403_FORBIDDEN, "login_again")
+    owner = _person(db, manage)
+    if owner is None or owner.id != person.id:
+        raise api_error(status.HTTP_403_FORBIDDEN, "login_again")
+    return person
+
+
+def require_parent(person: models.Person = Depends(require_manager)) -> models.Person:
+    """A parent, at home, with the manage cookie: every parent right is about managing the family."""
     if person.role != models.Role.PARENT:
         raise api_error(status.HTTP_403_FORBIDDEN, "parents_only")
-    require_manage_at_home(request)
     return person
 
 

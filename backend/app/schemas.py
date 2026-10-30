@@ -46,6 +46,8 @@ class PersonIn(BaseModel):
 
 class PersonPatch(BaseModel):
     name: str | None = Field(default=None, min_length=1, max_length=50)
+    # The parent's own PIN, needed to change their own e-mail address (the way back in when the PIN is forgotten)
+    current_pin: str | None = Field(default=None, pattern=r"^\d{4}$")
     role: Role | None = None
     active: bool | None = None
     email: str | None = Field(default=None, max_length=254, pattern=EMAIL)
@@ -54,6 +56,15 @@ class PersonPatch(BaseModel):
 
 
 class PinIn(BaseModel):
+    pin: str = Field(pattern=PIN)
+
+
+class PinResetIn(BaseModel):
+    name: str = Field(min_length=1, max_length=50)
+
+
+class PinResetConfirmIn(BaseModel):
+    token: str = Field(min_length=1, max_length=100)
     pin: str = Field(pattern=PIN)
 
 

@@ -31,6 +31,11 @@ services:
       # Cloudflare Access for logins from outside; empty = outside requests are refused
       - CF_TEAM_DOMAIN=${CF_TEAM_DOMAIN:-}
       - CF_AUDIENCE=${CF_AUDIENCE:-}
+      # Forgot PIN by e-mail through Resend: API key, sender, the hub's address
+      # at home (https://home.local.<domain>); all three or it's off
+      - RESEND_API_KEY=${RESEND_API_KEY:-}
+      - MAIL_FROM=${MAIL_FROM:-}
+      - HUB_PUBLIC_URL=${HUB_PUBLIC_URL:-}
     restart: unless-stopped
     healthcheck:
       test: [ "CMD-SHELL", "python3 -c 'import urllib.request; urllib.request.urlopen(\"http://localhost:8000/health\")' || exit 1" ]

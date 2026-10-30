@@ -29,6 +29,10 @@ def _people(db: Session, ids: list[int]) -> list[models.Person]:
     return found
 
 
+def _other_parents(tile: models.Tile, actor: models.Person) -> set[int]:
+    return {p.id for p in tile.people if p.role == models.Role.PARENT and p.id != actor.id}
+
+
 def _check_key(db: Session, key: str | None, tile_id: int | None = None) -> None:
     if key is None:
         return
@@ -73,9 +77,21 @@ def add_tile(body: schemas.TileIn, db: Session = Depends(get_db)):
     return tile
 
 
-@router.patch("/tiles/{tile_id}", response_model=schemas.TileOut, dependencies=[Depends(auth.require_parent)])
-def change_tile(tile_id: int, body: schemas.TilePatch, db: Session = Depends(get_db)):
+@router.patch("/tiles/{tile_id}", response_model=schemas.TileOut)
+def change_tile(
+    tile_id: int,
+    body: schemas.TilePatch,
+    actor: models.Person = Depends(auth.require_parent),
+    db: Session = Depends(get_db),
+):
     tile = _get(db, tile_id)
+    # A parent can't take an app away from another parent (security review 2026-10-30): not by unticking them, and
+    # not by moving the app's key to another tile
+    others = _other_parents(tile, actor)
+    if others and body.people is not None and not others <= set(body.people):
+        raise api_error(403, "other_parent")
+    if others and "app_key" in body.model_fields_set and body.app_key != tile.app_key:
+        raise api_error(403, "other_parent")
     if "app_key" in body.model_fields_set:
         _check_key(db, body.app_key, tile.id)
     for field in body.model_fields_set:
@@ -92,9 +108,12 @@ def change_tile(tile_id: int, body: schemas.TilePatch, db: Session = Depends(get
     return tile
 
 
-@router.delete("/tiles/{tile_id}", dependencies=[Depends(auth.require_parent)])
-def delete_tile(tile_id: int, db: Session = Depends(get_db)):
-    db.delete(_get(db, tile_id))
+@router.delete("/tiles/{tile_id}")
+def delete_tile(tile_id: int, actor: models.Person = Depends(auth.require_parent), db: Session = Depends(get_db)):
+    tile = _get(db, tile_id)
+    if _other_parents(tile, actor):
+        raise api_error(403, "other_parent")
+    db.delete(tile)
     db.commit()
     return {"deleted": tile_id}
 

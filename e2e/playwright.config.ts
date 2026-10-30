@@ -1,6 +1,6 @@
 import { defineConfig, devices } from '@playwright/test';
 import path from 'node:path';
-import { PYTHON as python } from './tests/helpers';
+import { OUTBOX, PYTHON as python } from './tests/helpers';
 
 // The tests start their own backend (fresh SQLite database, Admin PIN 1111) and frontend on ports of their own, so a
 // dev server on 8000/5173 and its data are never touched. E2E_PYTHON: the Python with the backend's packages.
@@ -37,6 +37,11 @@ export default defineConfig({
                 DEFAULT_LANGUAGE: 'en',
                 // Plain http in the tests: a Secure cookie would never come back
                 COOKIE_INSECURE: '1',
+                // "Forgot PIN" on, with the mails written to a file the tests read instead of sent (never on the NAS)
+                RESEND_API_KEY: 'test',
+                MAIL_FROM: 'hub@example.org',
+                HUB_PUBLIC_URL: FRONTEND,
+                MAIL_OUTBOX: OUTBOX,
             },
             reuseExistingServer: false,
             timeout: 60_000,
