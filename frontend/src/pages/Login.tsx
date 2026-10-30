@@ -22,12 +22,27 @@ export default function Login() {
     const [chosen, setChosen] = useState<string | null>(null);
     const [pin, setPin] = useState('');
     const [error, setError] = useState('');
+    // "Forgot PIN" only when the hub can send mails; then the same answer for everyone
+    const [canReset, setCanReset] = useState(false);
+    const [resetSent, setResetSent] = useState(false);
 
     useEffect(() => {
         api.get<Name[]>('/api/people/public')
             .then(res => setNames(res.data))
             .catch(() => setOutside(true));
+        api.get<{ pin_reset: boolean }>('/api/config').then(res => setCanReset(res.data.pin_reset)).catch(() => undefined);
     }, []);
+
+    const forgot = async () => {
+        if (!chosen) return;
+        setError('');
+        try {
+            await api.post('/api/pin-reset', { name: chosen });
+            setResetSent(true);
+        } catch (err) {
+            setError(errorMessage(err));
+        }
+    };
 
     const submit = async (e: FormEvent) => {
         e.preventDefault();
@@ -77,12 +92,18 @@ export default function Login() {
                     <label htmlFor="pin" className="sr-only">{t('login.pin')}</label>
                     <PinInput id="pin" value={pin} onChange={setPin} autoFocus />
                     {error && <p className={ERROR}>{error}</p>}
+                    {resetSent && <p role="status" className="text-slate-300">{t('login.resetSent')}</p>}
                     <div className="flex gap-2">
                         <button type="submit" className={`${BUTTON} flex-1`} disabled={pin.length !== 4}>{t('login.submit')}</button>
-                        <button type="button" className="px-3 text-slate-400 hover:text-white" onClick={() => { setChosen(null); setPin(''); setError(''); }}>
+                        <button type="button" className="px-3 text-slate-400 hover:text-white" onClick={() => { setChosen(null); setPin(''); setError(''); setResetSent(false); }}>
                             {t('login.otherPerson')}
                         </button>
                     </div>
+                    {canReset && !resetSent && (
+                        <button type="button" className="text-sm text-blue-300 hover:underline" onClick={() => void forgot()}>
+                            {t('login.forgot')}
+                        </button>
+                    )}
                 </form>
             )}
         </div>

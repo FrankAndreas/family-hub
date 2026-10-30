@@ -199,6 +199,9 @@ def set_pin(
 ):
     person = _get(db, person_id)
     _not_another_parent(actor, person)
+    if person.id == actor.id:
+        # One's own PIN only with the old one (PUT /me/pin) or a reset link
+        raise api_error(403, "own_pin_needs_old_pin")
     auth.new_pin(person, body.pin)
     db.commit()
     return {"ok": True}

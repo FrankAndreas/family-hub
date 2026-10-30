@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../AuthContext';
 import { BUTTON_SECONDARY } from '../ui';
+import LoginAgain from './LoginAgain';
 
 // The frame of every page once logged in: the family's name, Start, Settings, and logging out
 export default function Layout({ children }: { children: ReactNode }) {
@@ -22,6 +23,7 @@ export default function Layout({ children }: { children: ReactNode }) {
                     )}
                 </nav>
             </header>
+            <LoginAgain />
             <main>{children}</main>
         </div>
     );

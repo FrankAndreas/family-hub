@@ -72,3 +72,10 @@ def test_last_parent_check_holds_in_parallel(client, monkeypatch):
     for thread in threads:
         thread.join()
     assert sorted(codes) == [200, 400]
+
+
+def test_own_pin_only_with_the_old_one(client):
+    # A browser left logged in must not be enough to set a parent's own PIN: that goes through /me/pin
+    login(client)
+    refused = client.put(f"/api/people/{own_id(client)}/pin", json={"pin": "9999"})
+    assert refused.status_code == 403 and refused.json()["detail"] == "own_pin_needs_old_pin"

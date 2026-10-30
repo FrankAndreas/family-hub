@@ -17,3 +17,8 @@ export function safeNext(next: string | null, tileUrls: string[]): string | null
     });
     return known ? target.href : null;
 }
+
+// After "Log out" (an app sends people to /logout?next=<its address>): the login, keeping the app to go back to
+export function logoutTarget(next: string | null): string {
+    return next ? `/?next=${encodeURIComponent(next)}` : '/';
+}

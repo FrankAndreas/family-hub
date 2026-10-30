@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { safeNext } from './next';
+import { logoutTarget, safeNext } from './next';
 
 describe('safeNext', () => {
     const tiles = ['https://budget.local.example.ch', 'https://essen.local.example.ch/'];
@@ -12,5 +12,15 @@ describe('safeNext', () => {
         expect(safeNext('javascript:alert(1)', tiles)).toBeNull();
         expect(safeNext('/settings', tiles)).toBeNull();
         expect(safeNext(null, tiles)).toBeNull();
+    });
+});
+
+describe('logoutTarget', () => {
+    it('keeps the app to go back to after the next login', () => {
+        expect(logoutTarget('https://budget.local.example.ch/')).toBe('/?next=https%3A%2F%2Fbudget.local.example.ch%2F');
+    });
+    it('goes to the login without one', () => {
+        expect(logoutTarget(null)).toBe('/');
+        expect(logoutTarget('')).toBe('/');
     });
 });
