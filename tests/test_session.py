@@ -35,7 +35,7 @@ def test_jwks_verifies_a_hub_token(client):
 
 def test_session_for_apps(client, db):
     lena = make_person(db, "Lena", email="lena@example.ch", color="#f59e0b")
-    token = auth.issue_token(lena)
+    token = auth.issue_tokens(lena)[0]
     found = client.get("/api/session", headers=bearer(token)).json()
     assert found == {
         "valid": True,
@@ -60,7 +60,7 @@ def test_session_invalid(client, db):
     foreign = jwt.encode({**claims, "exp": datetime.now(timezone.utc) + timedelta(days=1)}, other, algorithm="EdDSA")
     key, _ = keys.signing_key()
     expired = jwt.encode({**claims, "exp": datetime.now(timezone.utc) - timedelta(minutes=1)}, key, algorithm="EdDSA")
-    token = auth.issue_token(lena)
+    token = auth.issue_tokens(lena)[0]
     for bad in (foreign, expired, "nonsense"):
         assert client.get("/api/session", headers=bearer(bad)).json() == {"valid": False, "person": None}
     # Logged out everywhere, or no longer active: earlier tokens end
@@ -80,7 +80,7 @@ def test_session_access_per_app(client, db):
     tile = models.Tile(name="Budget", local_url="https://budget.local.example.ch", app_key="budget")
     db.add(tile)
     db.commit()
-    headers = bearer(auth.issue_token(lena))
+    headers = bearer(auth.issue_tokens(lena)[0])
     # The login is valid either way; access says whether this app is hers
     found = client.get("/api/session", params={"app": "budget"}, headers=headers).json()
     assert (found["valid"], found["access"]) == (True, False)

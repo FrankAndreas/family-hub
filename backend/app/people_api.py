@@ -41,13 +41,15 @@ def login(body: schemas.LoginIn, request: Request, response: Response, db: Sessi
     device = request.cookies.get(auth.DEVICE_COOKIE)
     person = auth.authenticate(db, body.name, body.pin, device)
     auth.remember_device(db, response, person, device)
-    auth.set_cookie(response, auth.issue_token(person))
+    auth.set_cookies(response, *auth.issue_tokens(person))
     return person_out(person)
 
 
 @router.post("/logout")
-def logout(response: Response):
-    auth.clear_cookie(response)
+def logout(request: Request, response: Response, db: Session = Depends(get_db)):
+    """Ends this login, in the hub and in every app (they ask /api/session); other devices stay logged in."""
+    auth.end_login(db, request.cookies.get(auth.COOKIE))
+    auth.clear_cookies(response)
     return {"ok": True}
 
 
@@ -58,7 +60,7 @@ def logout_everywhere(
     """Ends every login of this person, on every device and in every app."""
     person.token_version += 1
     db.commit()
-    auth.clear_cookie(response)
+    auth.clear_cookies(response)
     return {"ok": True}
 
 
@@ -169,7 +171,7 @@ def set_own_pin(
     _new_pin(person, body.pin)
     db.commit()
     # Other devices are logged out; this one stays
-    auth.set_cookie(response, auth.issue_token(person))
+    auth.set_cookies(response, *auth.issue_tokens(person))
     return {"ok": True}
 
 
