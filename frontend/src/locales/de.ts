@@ -25,6 +25,7 @@ const de = {
         done: 'PIN geändert. Alle Anmeldungen sind beendet; melde dich mit der neuen PIN an.',
         toLogin: 'Zur Anmeldung',
     },
+    confirmEmail: { title: 'E-Mail-Adresse', done: 'Adresse bestätigt. Sie gilt ab jetzt.', toStart: 'Zum Familien-Hub' },
     loginAgain: { button: 'Nochmals anmelden' },
     start: {
         hello: 'Hallo {{name}}',
@@ -45,6 +46,7 @@ const de = {
         title: 'Personen',
         intro: 'Die Personen der Familie, für alle Apps. Mit der E-Mail-Adresse meldet man sich von unterwegs bei Cloudflare an.',
         currentPinForEmail: 'Deine aktuelle PIN (um deine E-Mail-Adresse zu ändern)',
+        pendingEmail: '{{email}} (wartet auf Bestätigung)',
         add: '+ Person hinzufügen',
         name: 'Name',
         email: 'E-Mail',
@@ -92,6 +94,7 @@ const de = {
         login_at_home_only: 'Die PIN-Anmeldung gibt es nur zu Hause.',
         not_logged_in: 'Nicht angemeldet.',
         login_again: 'Melde dich nochmals an, um das zu ändern.',
+        email_link_invalid: 'Dieser Link ist abgelaufen oder wurde schon benutzt. Speichere die Adresse nochmals für einen neuen.',
         other_parent: 'Jeder Elternteil ändert nur die eigenen Angaben.',
         pin_needed: 'Gib deine aktuelle PIN ein, um deine E-Mail-Adresse zu ändern.',
         reset_link_invalid: 'Dieser Link ist abgelaufen. Verlange einen neuen.',

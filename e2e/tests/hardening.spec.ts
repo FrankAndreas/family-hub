@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { ADMIN_PIN, lastResetLink, logIn, uniqueName } from './helpers';
+import { ADMIN_PIN, lastLink, logIn, uniqueName } from './helpers';
 
 async function addParent(page: Page, name: string, pin: string) {
     await page.getByRole('link', { name: 'Settings' }).click();
@@ -30,14 +30,18 @@ test('forgot PIN by e-mail', async ({ page }) => {
     await page.getByLabel('E-mail', { exact: true }).fill(email);
     await page.getByLabel('Your current PIN (to change your e-mail address)').fill('3579');
     await page.getByRole('button', { name: 'Save person' }).click();
-    await expect(page.getByRole('listitem').filter({ hasText: mia })).toContainText(email);
+    await expect(page.getByRole('listitem').filter({ hasText: mia })).toContainText(`${email} (waiting for confirmation)`);
+    // The address counts once the link mailed to it is opened
+    await page.goto(lastLink(email, 'confirm-email'));
+    await expect(page.getByRole('status')).toHaveText('Address confirmed. It counts from now on.');
+    await page.getByRole('link', { name: 'To the family hub' }).click();
     await logOut(page);
 
     await page.getByRole('button', { name: mia, exact: true }).click();
     await page.getByRole('button', { name: 'Forgot PIN?' }).click();
     await expect(page.getByRole('status')).toHaveText('If an e-mail address is registered, a link is on its way.');
 
-    await page.goto(lastResetLink(email));
+    await page.goto(lastLink(email, 'reset-pin'));
     await page.getByLabel('New PIN', { exact: true }).fill('2222');
     await page.getByLabel('New PIN again', { exact: true }).fill('2222');
     await page.getByRole('button', { name: 'Set PIN' }).click();
@@ -91,4 +95,22 @@ test('a late answer doesn\'t undo the logout', async ({ page }) => {
     await expect(page.getByRole('heading', { name: 'Who are you?' })).toBeVisible();
     await page.waitForTimeout(2000);
     await expect(page.getByRole('heading', { name: 'Who are you?' })).toBeVisible();
+});
+
+// Security review 2026-10-30, finding 2: a child made a parent with a new PIN in one save gets both
+test('promote a child and set the PIN in one save', async ({ page }) => {
+    const kid = uniqueName('Kid');
+    await logIn(page, 'Admin', ADMIN_PIN);
+    await page.getByRole('link', { name: 'Settings' }).click();
+    await page.getByRole('button', { name: '+ Add person' }).click();
+    await page.getByLabel('Name', { exact: true }).fill(kid);
+    await page.getByLabel('PIN of the person', { exact: true }).fill('1357');
+    await page.getByRole('button', { name: 'Save person' }).click();
+    await page.getByRole('button', { name: `Edit ${kid}` }).click();
+    await page.getByRole('combobox', { name: /^Role/ }).selectOption('PARENT');
+    await page.getByLabel('New PIN (empty: unchanged)', { exact: true }).fill('8642');
+    await page.getByRole('button', { name: 'Save person' }).click();
+    await expect(page.getByRole('listitem').filter({ hasText: kid })).toContainText('Parent');
+    await logOut(page);
+    await logIn(page, kid, '8642');
 });

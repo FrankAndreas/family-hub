@@ -5,7 +5,7 @@ import threading
 from fastapi import APIRouter, Depends, Request, Response
 from sqlalchemy.orm import Session
 
-from . import auth, config, models, pin_reset, schemas
+from . import addresses, auth, config, models, pin_reset, schemas
 from .database import get_db
 from .errors import api_error
 
@@ -18,6 +18,7 @@ def person_out(person: models.Person, at_home: bool = True) -> schemas.PersonOut
         id=person.id,
         name=person.name,
         email=person.email,
+        email_pending=person.email_pending,
         role=person.role,
         active=person.active,
         color=person.color,
@@ -115,15 +116,25 @@ def add_person(body: schemas.PersonIn, db: Session = Depends(get_db)):
     person = models.Person(
         name=body.name.strip(),
         name_key=auth.name_key(body.name),
-        email=body.email.strip().casefold() if body.email else None,
         pin_hash=auth.get_pin_hash(body.pin),
         role=body.role,
         color=body.color,
         language=body.language,
     )
     db.add(person)
+    db.flush()
+    confirm_due = addresses.set_address(db, person, body.email.strip().casefold() if body.email else None)
     db.commit()
+    if confirm_due:
+        addresses.send_confirmation(db, person)
     return person_out(person)
+
+
+@router.post("/email-confirm", dependencies=[Depends(auth.require_home)])
+def confirm_email(body: schemas.EmailConfirmIn, db: Session = Depends(get_db)):
+    """The link mailed to a new address: from now on it is the person's address."""
+    addresses.confirm(db, body.token)
+    return {"ok": True}
 
 
 # One change of parents at a time: the "last parent" check reads the others, and two parents making themselves children
@@ -162,7 +173,10 @@ def change_person(
     _not_another_parent(actor, person)
     fields = body.model_fields_set
     new_email = (body.email.strip().casefold() if body.email else None) if "email" in fields else person.email
-    if person.id == actor.id and new_email != person.email:
+    # The address the form shows may be the one still waiting for confirmation: saving it again changes nothing
+    if "email" in fields and new_email is not None and new_email == person.email_pending:
+        fields = fields - {"email"}
+    if person.id == actor.id and "email" in fields and new_email != person.email:
         # The address is the way back in when the PIN is forgotten: a browser left logged in isn't enough to change it
         if not body.current_pin:
             raise api_error(400, "pin_needed")
@@ -174,10 +188,7 @@ def change_person(
         _check_last_parent(db, person, body)
         if body.name is not None:
             person.name, person.name_key = body.name.strip(), auth.name_key(body.name)
-        if "email" in fields and new_email != person.email:
-            person.email = new_email
-            # Links sent to the old address stop working (security review 2026-10-30)
-            pin_reset.end_links(db, person)
+        confirm_due = "email" in fields and addresses.set_address(db, person, new_email)
         if body.role is not None:
             person.role = body.role
         if body.active is not None and body.active != person.active:
@@ -190,6 +201,8 @@ def change_person(
         if "language" in fields:
             person.language = body.language
         db.commit()
+    if confirm_due:
+        addresses.send_confirmation(db, person)
     return person_out(person)
 
 

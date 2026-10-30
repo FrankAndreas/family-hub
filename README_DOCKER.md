@@ -87,6 +87,14 @@ on the NAS:
 sudo docker exec hub-backend python -m app.reset_pin <name>
 ```
 
+An e-mail address someone enters counts only once the person opens the link mailed to it (24 hours, at home): until
+then it shows as "waiting for confirmation" and is neither the Cloudflare login nor the way back in. Addresses from
+before this rule stay as they were. Without the mail settings, or when the mail is lost, print the link on the NAS:
+
+```bash
+sudo docker exec hub-backend python -m app.confirm_email <name>
+```
+
 ### From outside: Cloudflare Tunnel and Access
 
 **Only through the Cloudflare tunnel, never a port forward.** The hub tells home from outside by the header
