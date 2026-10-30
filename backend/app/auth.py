@@ -294,11 +294,26 @@ def require_manage_at_home(request: Request) -> None:
         raise api_error(status.HTTP_403_FORBIDDEN, "manage_at_home_only")
 
 
-def require_parent(request: Request, person: models.Person = Depends(current_person)) -> models.Person:
-    """A parent, at home: every parent right is about managing the family."""
+def require_manager(
+    request: Request, person: models.Person = Depends(current_person), db: Session = Depends(database.get_db)
+) -> models.Person:
+    """Whoever changes something in the hub, at home, with the manage cookie of this very login (spec 2026-10-30 hub
+    hardening): the session cookie alone, which every app at home gets, manages nothing."""
+    require_manage_at_home(request)
+    session = token_claims(request.cookies.get(COOKIE), "session")
+    manage = token_claims(request.cookies.get(MANAGE_COOKIE), "manage")
+    if session is None or manage is None or manage.get("sid") != session.get("jti"):
+        raise api_error(status.HTTP_403_FORBIDDEN, "login_again")
+    owner = _person(db, manage)
+    if owner is None or owner.id != person.id:
+        raise api_error(status.HTTP_403_FORBIDDEN, "login_again")
+    return person
+
+
+def require_parent(person: models.Person = Depends(require_manager)) -> models.Person:
+    """A parent, at home, with the manage cookie: every parent right is about managing the family."""
     if person.role != models.Role.PARENT:
         raise api_error(status.HTTP_403_FORBIDDEN, "parents_only")
-    require_manage_at_home(request)
     return person
 
 

@@ -159,11 +159,11 @@ def set_pin(person_id: int, body: schemas.PinIn, db: Session = Depends(get_db)):
     return {"ok": True}
 
 
-@router.put("/me/pin", dependencies=[Depends(auth.require_manage_at_home)])
+@router.put("/me/pin")
 def set_own_pin(
     body: schemas.OwnPinIn,
     response: Response,
-    person: models.Person = Depends(auth.current_person),
+    person: models.Person = Depends(auth.require_manager),
     db: Session = Depends(get_db),
 ):
     # Counts toward the lock like a login: a session alone doesn't let anyone try PINs
@@ -182,6 +182,9 @@ def change_me(
     person: models.Person = Depends(auth.current_person),
     db: Session = Depends(get_db),
 ):
+    # Outside, the Cloudflare login is enough for one's own language and colour; at home it takes the manage cookie
+    if not auth.through_tunnel(request):
+        auth.require_manager(request, person, db)
     fields = body.model_fields_set
     if "language" in fields:
         person.language = body.language
