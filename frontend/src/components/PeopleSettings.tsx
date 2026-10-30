@@ -35,9 +35,10 @@ export default function PeopleSettings() {
             if (form.id === null) {
                 await api.post('/api/people', { ...body, pin: form.pin });
             } else {
+                // The PIN first: a child made a parent in this same save is then another parent, whose PIN no one else sets
+                if (form.pin) await api.put(`/api/people/${form.id}/pin`, { pin: form.pin });
                 const own = form.id === me?.id && body.email !== (form.oldEmail || null);
                 await api.patch(`/api/people/${form.id}`, { ...body, active: form.active, ...(own ? { current_pin: form.currentPin } : {}) });
-                if (form.pin) await api.put(`/api/people/${form.id}/pin`, { pin: form.pin });
             }
             setForm(null);
             setError('');

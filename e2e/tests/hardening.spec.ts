@@ -92,3 +92,21 @@ test('a late answer doesn\'t undo the logout', async ({ page }) => {
     await page.waitForTimeout(2000);
     await expect(page.getByRole('heading', { name: 'Who are you?' })).toBeVisible();
 });
+
+// Security review 2026-10-30, finding 2: a child made a parent with a new PIN in one save gets both
+test('promote a child and set the PIN in one save', async ({ page }) => {
+    const kid = uniqueName('Kid');
+    await logIn(page, 'Admin', ADMIN_PIN);
+    await page.getByRole('link', { name: 'Settings' }).click();
+    await page.getByRole('button', { name: '+ Add person' }).click();
+    await page.getByLabel('Name', { exact: true }).fill(kid);
+    await page.getByLabel('PIN of the person', { exact: true }).fill('1357');
+    await page.getByRole('button', { name: 'Save person' }).click();
+    await page.getByRole('button', { name: `Edit ${kid}` }).click();
+    await page.getByRole('combobox', { name: /^Role/ }).selectOption('PARENT');
+    await page.getByLabel('New PIN (empty: unchanged)', { exact: true }).fill('8642');
+    await page.getByRole('button', { name: 'Save person' }).click();
+    await expect(page.getByRole('listitem').filter({ hasText: kid })).toContainText('Parent');
+    await logOut(page);
+    await logIn(page, kid, '8642');
+});
