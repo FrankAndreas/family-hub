@@ -69,8 +69,9 @@ half a minute). The hub's `/logout` does the same for anyone who reaches it from
 Tell the two kinds of login apart by where the request came from (`Cf-Connecting-Ip`), never by the token's text. A
 request at home with a Cloudflare token as its cookie or Bearer is not logged in; a request from outside without
 `Cf-Access-Jwt-Assertion` neither. A "not logged in" from outside may only be a wrong `CF_AUDIENCE` or Cloudflare's
-keys out of reach: don't cache it, so it ends as soon as that is fixed. A 401 from outside reloads the page (Cloudflare
-asks for the e-mail code again) instead of going to the hub's home address, which is out of reach there.
+keys out of reach: don't cache it, so it ends as soon as that is fixed. A 401 from outside stays on the page with the
+error instead of going to the hub's home address, which is out of reach there (Cloudflare asks for its e-mail code by
+itself).
 
 Managing the hub (people, PINs, apps) needs a second cookie, `hub_manage`, that only the hub's own address gets: a
 `hub_session` an app passes on or leaks logs into the apps, but manages nothing.
