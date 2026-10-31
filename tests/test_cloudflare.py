@@ -31,13 +31,14 @@ def access(monkeypatch):
     return fetched
 
 
-def token(email="mama@example.ch", aud=AUD, minutes=60, issuer=f"https://{TEAM}", key=KEY):
+def token(email="mama@example.ch", aud=AUD, minutes=60, issuer=f"https://{TEAM}", key=KEY, leave_out=()):
     claims = {
         "email": email,
         "aud": [aud],
         "iss": issuer,
         "exp": datetime.now(timezone.utc) + timedelta(minutes=minutes),
     }
+    claims = {k: v for k, v in claims.items() if k not in leave_out}
     return jwt.encode(claims, key, algorithm="RS256", headers={"kid": "test-kid"})
 
 
@@ -65,6 +66,10 @@ def test_refused(client, db, access):
         token(minutes=-5),
         token(issuer="https://evil.cloudflareaccess.com"),
         token(key=other),
+        # Cloudflare always sets them; a token without one would never expire or fit any application
+        token(leave_out=("exp",)),
+        token(leave_out=("aud",)),
+        token(leave_out=("iss",)),
         "nonsense",
     ):
         assert client.get("/api/me", headers=outside(bad)).status_code == 401, bad

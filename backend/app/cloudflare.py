@@ -61,7 +61,13 @@ def person_for_token(db: Session, token: str | None) -> models.Person | None:
         if jwk is None:
             return None
         claims = jwt.decode(
-            token, jwt.PyJWK(jwk).key, algorithms=["RS256"], audience=audiences, issuer=f"https://{team}"
+            token,
+            jwt.PyJWK(jwk).key,
+            algorithms=["RS256"],
+            audience=audiences,
+            issuer=f"https://{team}",
+            # PyJWT checks these only when present; Cloudflare always sets them (security review 2026-10-31)
+            options={"require": ["exp", "aud", "iss"]},
         )
     except jwt.PyJWTError, ValueError, TypeError:
         return None

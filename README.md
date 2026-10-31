@@ -62,7 +62,16 @@ header.
 
 Log out: send the person to `https://home.local.<domain>/logout?next=<the app's address>`. The hub ends that login
 (for the hub and every app; `/api/session` says so within the app's cache time) and shows the login, which leads back
-to the app. An app doesn't clear the cookie itself.
+to the app. An app doesn't clear the cookie itself. From outside the login is Cloudflare Access's: send the person to
+the app's own `/cdn-cgi/access/logout`, which ends it for every family app (Cloudflare stops taking the old one within
+half a minute). The hub's `/logout` does the same for anyone who reaches it from outside.
+
+Tell the two kinds of login apart by where the request came from (`Cf-Connecting-Ip`), never by the token's text. A
+request at home with a Cloudflare token as its cookie or Bearer is not logged in; a request from outside without
+`Cf-Access-Jwt-Assertion` neither. A "not logged in" from outside may only be a wrong `CF_AUDIENCE` or Cloudflare's
+keys out of reach: don't cache it, so it ends as soon as that is fixed. A 401 from outside stays on the page with the
+error instead of going to the hub's home address, which is out of reach there (Cloudflare asks for its e-mail code by
+itself).
 
 Managing the hub (people, PINs, apps) needs a second cookie, `hub_manage`, that only the hub's own address gets: a
 `hub_session` an app passes on or leaks logs into the apps, but manages nothing.
