@@ -51,9 +51,11 @@ def _key(team: str, kid: str | None) -> dict | None:
     return cached[1].get(kid) if kid else None
 
 
-def person_for_token(db: Session, token: str | None) -> models.Person | None:
+def person_for_token(db: Session, token: str | None, audience: str | None = None) -> models.Person | None:
+    """The person of a Cloudflare token made for one of CF_AUDIENCE's applications, or only for `audience` (an app's
+    own application, hub#12)."""
     team = config.env("CF_TEAM_DOMAIN")
-    audiences = [a.strip() for a in config.env("CF_AUDIENCE").split(",") if a.strip()]
+    audiences = [audience] if audience else [a.strip() for a in config.env("CF_AUDIENCE").split(",") if a.strip()]
     if not token or not team or not audiences:
         return None
     try:
@@ -77,5 +79,5 @@ def person_for_token(db: Session, token: str | None) -> models.Person | None:
     return db.query(models.Person).filter(models.Person.email == email, models.Person.active.is_(True)).first()
 
 
-def person_for(request: Request, db: Session) -> models.Person | None:
-    return person_for_token(db, request.headers.get(HEADER))
+def person_for(request: Request, db: Session, audience: str | None = None) -> models.Person | None:
+    return person_for_token(db, request.headers.get(HEADER), audience)

@@ -81,6 +81,8 @@ const de = {
         appKeyHint: 'nur für Apps mit dem Familien-Login, z. B. budget',
         who: 'Wer darf sie nutzen',
         shareEmail: 'Die App darf ihre bestätigten E-Mail-Adressen sehen (z. B. für Erinnerungen)',
+        cfAudience: 'Cloudflare Access: AUD-Tag der Anwendung dieser App',
+        cfAudienceHint: 'optional; dann zählen von unterwegs nur Logins für diese App',
         peopleCount_one: '{{count}} Person',
         peopleCount_other: '{{count}} Personen',
     },

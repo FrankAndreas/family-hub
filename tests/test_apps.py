@@ -83,3 +83,42 @@ def test_parents_switch_email_sharing_on_a_tile(client):
     tile = client.post("/api/tiles", json=body).json()
     assert tile["share_email"] is False
     assert client.patch(f"/api/tiles/{tile['id']}", json={"share_email": True}).json()["share_email"] is True
+
+
+# hub#12: a tile may name its app's Cloudflare Access application (its AUD tag). Then a Cloudflare login counts for that
+# app only when Cloudflare made it for that application: one leaked from another family app, or the hub, gets nowhere
+MEALS_AUD = "a" * 64
+
+
+def test_an_apps_own_audience_only(client, db, access):  # noqa: F811
+    mama = make_person(db, "Mama", role="PARENT", email="mama@example.ch")
+    tile = budget(db, mama)
+    tile.cf_audience = MEALS_AUD
+    db.commit()
+    for headers in ({}, THROUGH_TUNNEL):
+        own = {**headers, "Cf-Access-Jwt-Assertion": token(aud=MEALS_AUD)}
+        other = {**headers, "Cf-Access-Jwt-Assertion": token()}
+        assert client.get("/api/session?app=budget", headers=own).json()["access"] is True
+        assert client.get("/api/session?app=budget", headers=other).json()["valid"] is False
+        assert client.get("/api/apps/budget/people", headers=own).status_code == 200
+        assert client.get("/api/apps/budget/people", headers=other).status_code == 401
+    # Without the app, or for an app whose tile names no application, every family application counts as before
+    assert client.get("/api/session", headers={"Cf-Access-Jwt-Assertion": token()}).json()["valid"] is True
+    tile.cf_audience = None
+    db.commit()
+    assert client.get("/api/session?app=budget", headers=outside(token())).json()["access"] is True
+    # The hub's own login is unaffected
+    assert client.get("/api/session?app=budget", headers=bearer(auth.issue_tokens(mama)[0])).json()["access"] is True
+
+
+def test_parents_set_a_tiles_cloudflare_application(client):
+    from helpers import login
+
+    login(client)
+    body = {"name": "Essen", "local_url": "https://essen.local.example.ch", "app_key": "meals"}
+    tile = client.post("/api/tiles", json=body).json()
+    assert tile["cf_audience"] is None
+    assert client.patch(f"/api/tiles/{tile['id']}", json={"cf_audience": MEALS_AUD}).json()["cf_audience"] == MEALS_AUD
+    # Cloudflare's tags are 64 hex characters; anything else is a typo
+    assert client.patch(f"/api/tiles/{tile['id']}", json={"cf_audience": "essen"}).status_code == 422
+    assert client.patch(f"/api/tiles/{tile['id']}", json={"cf_audience": None}).json()["cf_audience"] is None

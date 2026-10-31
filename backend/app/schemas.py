@@ -88,6 +88,8 @@ class MePatch(BaseModel):
 URL = r"^(https://[^\s/]+(/\S*)?|http://(localhost|127\.0\.0\.1)(:\d+)?(/\S*)?)$"
 # An app's key: lowercase letters, digits and dashes, starting with a letter, 2 to 20 long
 APP_KEY = r"^[a-z][a-z0-9-]{1,19}$"
+# Cloudflare Access's Application Audience (AUD) tag
+CF_AUDIENCE = r"^[0-9a-f]{64}$"
 
 
 class TileIn(BaseModel):
@@ -102,6 +104,8 @@ class TileIn(BaseModel):
     people: list[int] = []
     # The app may see its people's confirmed e-mail addresses
     share_email: bool = False
+    # The AUD tag of the app's Cloudflare Access application (None: any of CF_AUDIENCE)
+    cf_audience: str | None = Field(default=None, pattern=CF_AUDIENCE)
 
 
 class TilePatch(BaseModel):
@@ -112,6 +116,7 @@ class TilePatch(BaseModel):
     app_key: str | None = Field(default=None, pattern=APP_KEY)
     people: list[int] | None = None
     share_email: bool | None = None
+    cf_audience: str | None = Field(default=None, pattern=CF_AUDIENCE)
 
 
 class TileOut(BaseModel):
@@ -124,6 +129,7 @@ class TileOut(BaseModel):
     app_key: str | None
     people: list[int]
     share_email: bool
+    cf_audience: str | None
 
     @field_validator("people", mode="before")
     @classmethod

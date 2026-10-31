@@ -25,4 +25,6 @@ export interface TileFull {
     app_key: string | null; people: number[];
     // The app may see its people's confirmed e-mail addresses
     share_email: boolean;
+    // The AUD tag of the app's Cloudflare Access application: its Cloudflare logins count only for it
+    cf_audience: string | null;
 }

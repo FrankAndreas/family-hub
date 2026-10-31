@@ -100,8 +100,8 @@ def change_tile(
             if value is not None:
                 tile.people = _people(db, value)
             continue
-        # Name, icon and the home address can't be emptied; the outside address and the app key can
-        if value is None and field not in ("remote_url", "app_key"):
+        # Name, icon and the home address can't be emptied; the outside address, the app key and the AUD tag can
+        if value is None and field not in ("remote_url", "app_key", "cf_audience"):
             continue
         setattr(tile, field, value)
     db.commit()
