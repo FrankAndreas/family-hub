@@ -31,24 +31,45 @@ def session_person(person: models.Person) -> dict:
     }
 
 
-def caller(
-    request: Request,
-    credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
-    db: Session = Depends(get_db),
+def _login(
+    request: Request, credentials: HTTPAuthorizationCredentials | None, db: Session, app_key: str | None
 ) -> models.Person | None:
     """The login as an app passes it: the hub login (Bearer) at home, or the Cloudflare Access token (as Cloudflare
-    sent it, Cf-Access-Jwt-Assertion) from outside; else the browser's own login."""
+    sent it, Cf-Access-Jwt-Assertion) from outside; else the browser's own login. A Cloudflare token for an app whose
+    tile names its Access application counts only when made for that application (hub#12)."""
+    tile = db.query(models.Tile).filter(models.Tile.app_key == app_key).first() if app_key else None
+    audience = tile.cf_audience if tile else None
     if auth.through_tunnel(request):
         # From outside only Cloudflare's token counts: a hub token there may be a stolen home cookie, which the app
         # passed on (apps pass Cf-Connecting-Ip on with it; see README "For apps")
-        person = cloudflare.person_for(request, db)
+        person = cloudflare.person_for(request, db, audience)
     elif credentials is not None:
         person = auth.person_for_token(db, credentials.credentials)
     elif cloudflare.HEADER in request.headers:
-        person = cloudflare.person_for(request, db)
+        person = cloudflare.person_for(request, db, audience)
     else:
         person = auth.current_person_or_none(request, db)
     return person
+
+
+def caller(
+    request: Request,
+    app: str | None = None,
+    credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
+    db: Session = Depends(get_db),
+) -> models.Person | None:
+    """The login for /api/session?app=<key>."""
+    return _login(request, credentials, db, app)
+
+
+def app_caller(
+    request: Request,
+    key: str,
+    credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
+    db: Session = Depends(get_db),
+) -> models.Person | None:
+    """The login for /api/apps/<key>/..."""
+    return _login(request, credentials, db, key)
 
 
 def has_access(db: Session, person: models.Person, app_key: str) -> bool:

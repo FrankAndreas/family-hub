@@ -87,3 +87,19 @@ test('access per app', async ({ page }) => {
     await logIn(page, 'Admin', ADMIN_PIN);
     await expect(page.getByRole('link', { name: new RegExp(app) })).toBeVisible();
 });
+
+// An app's Cloudflare Access application (hub#12): its AUD tag is kept, and shown again when editing the app
+test('the AUD tag of an app', async ({ page }) => {
+    await logIn(page, 'Admin', ADMIN_PIN);
+    await page.getByRole('link', { name: 'Settings' }).click();
+    const app = uniqueName('Essen');
+    const tag = 'ab'.repeat(32);
+    await page.getByRole('button', { name: '+ Add app' }).click();
+    await page.getByLabel('App name', { exact: true }).fill(app);
+    await page.getByLabel('Address at home', { exact: true }).fill('https://essen.local.example.ch');
+    await page.getByLabel('App key', { exact: true }).fill(`k${Math.random().toString(36).slice(2, 8).replace(/[^a-z]/g, 'x')}`);
+    await page.getByLabel("Cloudflare Access: the AUD tag of this app's application").fill(tag.toUpperCase());
+    await page.getByRole('button', { name: 'Save app' }).click();
+    await page.getByRole('button', { name: `Edit ${app}` }).click();
+    await expect(page.getByLabel("Cloudflare Access: the AUD tag of this app's application")).toHaveValue(tag);
+});

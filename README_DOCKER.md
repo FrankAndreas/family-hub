@@ -111,6 +111,10 @@ menus from time to time.
 3. **`.env`**: `CF_TEAM_DOMAIN=<team>.cloudflareaccess.com` and `CF_AUDIENCE=<the AUD tag>`. When apps pass their
    visitors' Cloudflare tokens to the hub, add their applications' AUD tags too, comma-separated. Then
    `sudo docker-compose up -d`.
+4. **Each app's tile** (Settings → Apps → the app → "Cloudflare Access: the AUD tag of this app's application"): with
+   its own application's tag there, the hub takes a Cloudflare login for that app only when Cloudflare made it for that
+   application, so a login leaked from another family app or the hub gets nowhere. Optional; without it any tag in
+   `CF_AUDIENCE` counts. Only with one Access application per app: tiles sharing one application gain nothing.
 
 An app stays home-only when the tunnel has no route for it (like family-budget-dashboard). Give such an app no
 outside address in the hub.

@@ -15,7 +15,7 @@ router = APIRouter(tags=["apps"])
 
 
 @router.get("/api/apps/{key}/people")
-def app_people(key: str, person: models.Person | None = Depends(session_api.caller), db: Session = Depends(get_db)):
+def app_people(key: str, person: models.Person | None = Depends(session_api.app_caller), db: Session = Depends(get_db)):
     if person is None:
         raise api_error(401, "not_logged_in")
     tile = db.query(models.Tile).filter(models.Tile.app_key == key).first()

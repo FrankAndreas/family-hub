@@ -73,6 +73,9 @@ class Tile(Base):
     # The app may see its people's confirmed e-mail addresses (e.g. the job tracking app: reminders, its own mails);
     # other apps get no addresses (2026-10-30)
     share_email: Mapped[bool] = mapped_column(default=False, server_default=false())
+    # The AUD tag of the app's Cloudflare Access application (hub#12): a Cloudflare login counts for this app only when
+    # made for that application. None: any of CF_AUDIENCE, as for the hub itself
+    cf_audience: Mapped[str | None] = mapped_column(String(64))
     people: Mapped[list[Person]] = relationship(secondary=tile_access, order_by=Person.id)
 
 

@@ -83,6 +83,8 @@ const en: typeof de = {
         appKeyHint: 'only for apps that use the family login, e.g. budget',
         who: 'Who may use it',
         shareEmail: 'The app may see their confirmed e-mail addresses (e.g. for reminders)',
+        cfAudience: 'Cloudflare Access: the AUD tag of this app\'s application',
+        cfAudienceHint: 'optional; then only logins from outside for this app count',
         peopleCount_one: '{{count}} person',
         peopleCount_other: '{{count}} people',
     },

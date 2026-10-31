@@ -32,8 +32,8 @@ An app that switches to the hub drops its own PINs and asks the hub who is logge
 - **A request from outside** carries `Cf-Connecting-Ip` (Cloudflare sets it on everything through the tunnel). The app
   passes on that header and `Cf-Access-Jwt-Assertion`, **and never a `hub_session` cookie**: one arriving from outside
   can only be a stolen home login. The hub checks Cloudflare's token against Cloudflare's keys and the Access
-  applications in its `CF_AUDIENCE`, so the app needs no Cloudflare settings of its own; with `Cf-Connecting-Ip` it
-  ignores any hub token.
+  applications in its `CF_AUDIENCE` (or only the app's own application, when its tile names one), so the app needs no
+  Cloudflare settings of its own; with `Cf-Connecting-Ip` it ignores any hub token.
 - **A request at home** (no `Cf-Connecting-Ip`) carries the hub's cookie `hub_session` (set for `local.<domain>`). The
   app passes it on as `Authorization: Bearer <hub_session>`.
 - Neither header nor cookie belongs in an app's logs: each is a login to the hub, a parent's with full rights.
