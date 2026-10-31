@@ -33,3 +33,10 @@ export function logoutTarget(next: string | null): string {
 export function logoutAddress(atHome: boolean): string | null {
     return atHome ? null : '/cdn-cgi/access/logout';
 }
+
+// What /logout?next=<app> does once it knows who is logged in: outside it ends the Cloudflare Access login (an app's
+// "Log out" may send people here from outside too; security review 2026-10-31), at home the hub's own login
+export function logoutStep(person: { at_home: boolean } | null, next: string | null): { leave: string } | { hub: string } {
+    const outside = person ? logoutAddress(person.at_home) : null;
+    return outside ? { leave: outside } : { hub: logoutTarget(next) };
+}
