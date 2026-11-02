@@ -8,4 +8,4 @@ pyjwt==2.15.1
 cryptography==50.0.2
 alembic==1.20.1
 # Time zone database for zoneinfo; the slim Docker image has none
-tzdata==2026.5
+tzdata==2026.6
