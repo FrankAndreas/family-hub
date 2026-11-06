@@ -33,10 +33,10 @@ test('own PIN: the new one twice', async ({ page }) => {
     await page.getByLabel('New PIN', { exact: true }).fill('7391');
     await page.getByLabel('New PIN again', { exact: true }).fill('7392');
     await page.getByRole('button', { name: 'Change PIN' }).click();
-    await expect(page.getByText("The two PINs don't match.")).toBeVisible();
+    await expect(page.getByRole('alert')).toHaveText("The two PINs don't match.");
     await page.getByLabel('New PIN again', { exact: true }).fill('7391');
     await page.getByRole('button', { name: 'Change PIN' }).click();
-    await expect(page.getByText('PIN changed.', { exact: false })).toBeVisible();
+    await expect(page.getByRole('status')).toContainText('PIN changed.');
 });
 
 // A language change that fails says so

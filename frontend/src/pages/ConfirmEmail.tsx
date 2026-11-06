@@ -26,7 +26,7 @@ export default function ConfirmEmail() {
             <div className={`${CARD} space-y-4`}>
                 <h1 className="text-xl font-semibold">{t('confirmEmail.title')}</h1>
                 {state === 'done' && <p role="status">{t('confirmEmail.done')}</p>}
-                {state === 'failed' && <p className={ERROR}>{error}</p>}
+                {state === 'failed' && <p role="alert" className={ERROR}>{error}</p>}
                 {state !== 'busy' && <a href="/" className={`${BUTTON} inline-block`}>{t('confirmEmail.toStart')}</a>}
             </div>
         </div>

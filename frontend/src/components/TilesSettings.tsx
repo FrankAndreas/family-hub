@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import api, { errorMessage } from '../api';
 import { useAuth } from '../AuthContext';
 import type { Person, TileFull } from '../types';
-import { BUTTON, BUTTON_SECONDARY, CARD, ERROR, INPUT } from '../ui';
+import { BUTTON, BUTTON_SECONDARY, CARD, ERROR, INPUT, TOUCH } from '../ui';
 import { useFormFocus } from './useFormFocus';
 
 interface Form {
@@ -87,7 +87,7 @@ export default function TilesSettings({ people }: { people: Person[] }) {
                 {!form && <button type="button" className={BUTTON_SECONDARY} onClick={() => setForm(empty)}>{t('tiles.add')}</button>}
             </div>
             <p className="text-sm text-slate-400">{t('tiles.intro')}</p>
-            {error && <p className={ERROR}>{error}</p>}
+            {error && <p role="alert" className={ERROR}>{error}</p>}
             {form && (
                 <form ref={formRef} onSubmit={save} className="grid gap-2 sm:grid-cols-2">
                     <label className="text-sm text-slate-400">{t('tiles.name')}
@@ -165,12 +165,12 @@ export default function TilesSettings({ people }: { people: Person[] }) {
                         <span className="text-sm text-slate-400">{tile.remote_url ? t('tiles.alsoOutside') : t('tiles.homeOnly')}</span>
                         {tile.app_key && <span className="text-sm text-slate-400">· {t('tiles.peopleCount', { count: tile.people.length })}</span>}
                         <span className="ml-auto flex gap-2 text-sm">
-                            <button type="button" disabled={index === 0} className="text-slate-400 hover:text-white disabled:opacity-30"
+                            <button type="button" disabled={index === 0} className={`${TOUCH} text-slate-400 hover:text-white disabled:opacity-30`}
                                 aria-label={t('tiles.up', { name: tile.name })} onClick={() => move(index, -1)}>↑</button>
-                            <button type="button" disabled={index === tiles.length - 1} className="text-slate-400 hover:text-white disabled:opacity-30"
+                            <button type="button" disabled={index === tiles.length - 1} className={`${TOUCH} text-slate-400 hover:text-white disabled:opacity-30`}
                                 aria-label={t('tiles.down', { name: tile.name })} onClick={() => move(index, 1)}>↓</button>
                             {/* One form at a time: another "Edit" would throw away what is typed in the open one */}
-                            <button type="button" className="text-blue-300 hover:underline disabled:opacity-30 disabled:no-underline"
+                            <button type="button" className={`${TOUCH} text-blue-300 hover:underline disabled:opacity-30 disabled:no-underline`}
                                 aria-label={t('tiles.editOf', { name: tile.name })} disabled={form !== null}
                                 onClick={() => setForm({
                                     id: tile.id, name: tile.name, icon: tile.icon, local_url: tile.local_url, remote_url: tile.remote_url ?? '',
@@ -180,7 +180,7 @@ export default function TilesSettings({ people }: { people: Person[] }) {
                                 })}>
                                 {t('common.edit')}
                             </button>
-                            <button type="button" className="text-red-300 hover:underline disabled:opacity-30 disabled:no-underline"
+                            <button type="button" className={`${TOUCH} text-red-300 hover:underline disabled:opacity-30 disabled:no-underline`}
                                 aria-label={t('tiles.deleteOf', { name: tile.name })} disabled={protectedParents(tile).length > 0}
                                 title={protectedParents(tile).length > 0 ? t('tiles.deleteLocked', { names: names(protectedParents(tile)) }) : undefined}
                                 onClick={() => remove(tile)}>{t('common.delete')}</button>

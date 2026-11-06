@@ -7,7 +7,7 @@ import { useAuth } from '../AuthContext';
 import PinInput from '../components/PinInput';
 import { safeNext } from '../next';
 import type { Tile } from '../types';
-import { BUTTON, BUTTON_SECONDARY, CARD, ERROR } from '../ui';
+import { BUTTON, BUTTON_SECONDARY, CARD, ERROR, TOUCH } from '../ui';
 
 interface Name { name: string; color: string | null }
 
@@ -121,7 +121,7 @@ export default function Login() {
                         // A PIN has 4 digits: the last one logs in, one tap less on the tablet
                         if (value.length === 4) void logIn(value);
                     }} />
-                    {error && <p className={ERROR}>{error}</p>}
+                    {error && <p role="alert" className={ERROR}>{error}</p>}
                     {resetSent && <p role="status" className="text-slate-300">{t('login.resetSent')}</p>}
                     <div className="flex gap-2">
                         <button type="submit" className={`${BUTTON} flex-1`} disabled={pin.length !== 4}>{t('login.submit')}</button>
@@ -130,7 +130,7 @@ export default function Login() {
                         </button>
                     </div>
                     {canReset && !resetSent && (
-                        <button type="button" className="text-sm text-blue-300 hover:underline" onClick={() => void forgot()}>
+                        <button type="button" className={`${TOUCH} text-sm text-blue-300 hover:underline`} onClick={() => void forgot()}>
                             {t('login.forgot')}
                         </button>
                     )}

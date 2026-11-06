@@ -44,7 +44,7 @@ export default function ResetPin() {
                         <PinInput id="reset-pin" value={pin} onChange={setPin} autoComplete="new-password" autoFocus />
                         <label htmlFor="reset-again" className="block text-sm text-slate-400">{t('reset.again')}</label>
                         <PinInput id="reset-again" value={again} onChange={setAgain} autoComplete="new-password" />
-                        {error && <p className={ERROR}>{error}</p>}
+                        {error && <p role="alert" className={ERROR}>{error}</p>}
                         <button type="submit" className={BUTTON} disabled={pin.length !== 4 || again.length !== 4}>{t('reset.submit')}</button>
                     </form>
                 )}

@@ -43,7 +43,8 @@ test('wrong PIN', async ({ page }) => {
     await page.getByRole('button', { name: 'Admin', exact: true }).click();
     const pin = page.getByLabel('PIN', { exact: true });
     await pin.pressSequentially('0000');
-    await expect(page.getByText('Wrong name or PIN')).toBeVisible();
+    // Announced to screen readers
+    await expect(page.getByRole('alert')).toHaveText('Wrong name or PIN');
     await expect(pin).toHaveValue('');
     await expect(pin).toBeFocused();
     await page.keyboard.type(ADMIN_PIN);

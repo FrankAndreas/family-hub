@@ -9,3 +9,5 @@ export const BUTTON_DANGER =
     'rounded-lg border border-red-400/40 px-4 py-2 text-red-300 hover:bg-red-900/30 disabled:opacity-50';
 export const CARD = 'glass-card p-5';
 export const ERROR = 'rounded-lg border border-red-400/30 bg-red-900/30 p-3 text-sm text-red-200';
+// Small text buttons in lists (↑ ↓ Edit Delete): a finger-sized target on touch screens, unchanged with a mouse
+export const TOUCH = 'inline-flex items-center justify-center pointer-coarse:min-h-11 pointer-coarse:min-w-11';
