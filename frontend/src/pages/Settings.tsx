@@ -101,8 +101,8 @@ export default function Settings() {
                         {t('settings.changePin')}
                     </button>
                 </form>
-                {message && <p className="text-sm text-emerald-300">{message}</p>}
-                {error && <p className={ERROR}>{error}</p>}
+                {message && <p role="status" className="text-sm text-emerald-300">{message}</p>}
+                {error && <p role="alert" className={ERROR}>{error}</p>}
             </section>}
             <section className={`${CARD} space-y-3`}>
                 <div className="flex flex-wrap items-end gap-4">

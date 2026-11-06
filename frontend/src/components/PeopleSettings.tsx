@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import api, { errorMessage } from '../api';
 import { useAuth } from '../AuthContext';
 import type { Person, Role } from '../types';
-import { BUTTON, BUTTON_SECONDARY, CARD, ERROR, INPUT } from '../ui';
+import { BUTTON, BUTTON_SECONDARY, CARD, ERROR, INPUT, TOUCH } from '../ui';
 import PinInput from './PinInput';
 import { useFormFocus } from './useFormFocus';
 
@@ -65,7 +65,7 @@ export default function PeopleSettings({ people, loadError, reload }: { people: 
                 {!form && <button type="button" className={BUTTON_SECONDARY} onClick={() => setForm(empty)}>{t('people.add')}</button>}
             </div>
             <p className="text-sm text-slate-400">{t('people.intro')}</p>
-            {(error || loadError) && <p className={ERROR}>{error || loadError}</p>}
+            {(error || loadError) && <p role="alert" className={ERROR}>{error || loadError}</p>}
             {form && (
                 <form ref={formRef} onSubmit={save} className="grid gap-2 sm:grid-cols-2">
                     <label className="text-sm text-slate-400">{t('people.name')}
@@ -117,15 +117,15 @@ export default function PeopleSettings({ people, loadError, reload }: { people: 
                 {people.map(p => (
                     <li key={p.id} className="flex flex-wrap items-center gap-2 py-2">
                         <span aria-hidden="true" className="h-3 w-3 rounded-full" style={{ background: p.color ?? '#64748b' }} />
-                        <span className={`min-w-0 break-words font-medium ${p.active ? '' : 'text-slate-500 line-through'}`}>{p.name}</span>
+                        <span className={`min-w-0 break-words font-medium ${p.active ? '' : 'text-slate-400 line-through'}`}>{p.name}</span>
                         <span className="text-sm text-slate-400">{t(`people.roles.${p.role}`)}</span>
-                        {p.email && <span className="min-w-0 break-all text-sm text-slate-500">{p.email}</span>}
+                        {p.email && <span className="min-w-0 break-all text-sm text-slate-400">{p.email}</span>}
                         {p.email_pending && (
                             <span className="min-w-0 break-all text-sm text-amber-300">{t('people.pendingEmail', { email: p.email_pending })}</span>
                         )}
                         {(p.role !== 'PARENT' || p.id === me?.id) ? (
                             // One form at a time: another "Edit" would throw away what is typed in the open one
-                            <button type="button" className="ml-auto text-sm text-blue-300 hover:underline disabled:opacity-30 disabled:no-underline"
+                            <button type="button" className={`${TOUCH} ml-auto text-sm text-blue-300 hover:underline disabled:opacity-30 disabled:no-underline`}
                                 disabled={form !== null} onClick={() => edit(p)}
                                 aria-label={t('people.editOf', { name: p.name })}>{t('common.edit')}</button>
                         ) : (

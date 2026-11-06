@@ -2,13 +2,13 @@ import { type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, NavLink } from 'react-router-dom';
 import { useAuth } from '../AuthContext';
-import { BUTTON_SECONDARY } from '../ui';
+import { BUTTON_SECONDARY, TOUCH } from '../ui';
 import LoginAgain from './LoginAgain';
 import { logoutAddress } from '../next';
 
 // The page one is on stands out (NavLink also sets aria-current="page")
 const navClass = ({ isActive }: { isActive: boolean }) =>
-    isActive ? 'font-semibold text-white underline decoration-cyan-400 decoration-2 underline-offset-8' : 'text-slate-300 hover:text-white';
+    `${TOUCH} ${isActive ? 'font-semibold text-white underline decoration-cyan-400 decoration-2 underline-offset-8' : 'text-slate-300 hover:text-white'}`;
 
 // The frame of every page once logged in: the family's name, Start, Settings, and logging out
 export default function Layout({ children }: { children: ReactNode }) {
