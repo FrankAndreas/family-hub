@@ -115,7 +115,7 @@ const en: typeof de = {
         email_link_invalid: 'This link has expired or was used already. Save the address again for a new one.',
         other_parent: 'Each parent changes only their own details.',
         pin_needed: 'Enter your current PIN to change your e-mail address.',
-        reset_link_invalid: 'This link has expired. Ask for a new one.',
+        reset_link_invalid: 'This link is invalid or has expired. Ask for a new one.',
         own_pin_needs_old_pin: 'Change your own PIN under “My PIN”, with the current one.',
         parents_only: 'Parents only.',
         name_taken: 'This name is taken.',

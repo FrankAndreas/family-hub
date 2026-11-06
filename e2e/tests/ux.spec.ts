@@ -37,6 +37,9 @@ test('own PIN: the new one twice', async ({ page }) => {
     await page.getByLabel('New PIN again', { exact: true }).fill('7391');
     await page.getByRole('button', { name: 'Change PIN' }).click();
     await expect(page.getByRole('status')).toContainText('PIN changed.');
+    // Typing again clears it
+    await page.getByLabel('Current PIN', { exact: true }).fill('7');
+    await expect(page.getByRole('status')).toHaveCount(0);
 });
 
 // A language change that fails says so
@@ -87,4 +90,24 @@ test('app key format', async ({ page }) => {
     await page.getByRole('button', { name: '+ Add app' }).click();
     await expect(page.getByLabel('App name', { exact: true })).toBeFocused();
     await expect(page.getByLabel('App key', { exact: true })).toHaveAttribute('title', /Lowercase letters, digits and hyphens/);
+});
+
+// The tab's title follows the language: the browser's before the login, the person's after it
+test('tab title per language', async ({ page }) => {
+    await page.goto('/');
+    await expect(page).toHaveTitle('Family');
+    await logIn(page, 'Admin', ADMIN_PIN);
+    await page.getByRole('link', { name: 'Settings' }).click();
+    await page.getByLabel('Language').selectOption('de');
+    await expect(page).toHaveTitle('Familie');
+    await page.getByLabel('Sprache').selectOption('en');
+    await expect(page).toHaveTitle('Family');
+});
+
+// A reset link without its token says so at once, without a form to fill in first
+test('reset link without a token', async ({ page }) => {
+    await page.goto('/reset-pin');
+    await expect(page.getByRole('alert')).toHaveText('This link is invalid or has expired. Ask for a new one.');
+    await expect(page.getByLabel('New PIN', { exact: true })).toHaveCount(0);
+    await expect(page.getByRole('link', { name: 'To the login' })).toBeVisible();
 });

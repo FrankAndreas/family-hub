@@ -32,7 +32,13 @@ export default function ResetPin() {
         <div className="mx-auto max-w-md px-4 py-10">
             <div className={`${CARD} space-y-4`}>
                 <h1 className="text-xl font-semibold">{t('reset.title')}</h1>
-                {done ? (
+                {!token ? (
+                    // Opened without the token (cut off when copied, or typed): say so before anyone types a PIN
+                    <>
+                        <p role="alert" className={ERROR}>{t('errors.reset_link_invalid')}</p>
+                        <a href="/" className={`${BUTTON} inline-block`}>{t('reset.toLogin')}</a>
+                    </>
+                ) : done ? (
                     <>
                         <p role="status">{t('reset.done')}</p>
                         {/* A full load: the new PIN ended every login, this browser's too */}
