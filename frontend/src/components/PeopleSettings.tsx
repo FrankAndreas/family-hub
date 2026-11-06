@@ -5,6 +5,7 @@ import { useAuth } from '../AuthContext';
 import type { Person, Role } from '../types';
 import { BUTTON, BUTTON_SECONDARY, CARD, ERROR, INPUT } from '../ui';
 import PinInput from './PinInput';
+import { useFormFocus } from './useFormFocus';
 
 interface Form {
     id: number | null; name: string; email: string; role: Role; color: string; active: boolean; pin: string;
@@ -23,6 +24,7 @@ export default function PeopleSettings({ people, loadError, reload }: { people: 
     const { person: me } = useAuth();
     const [form, setForm] = useState<Form | null>(null);
     const [error, setError] = useState('');
+    const formRef = useFormFocus(form ? String(form.id) : null);
 
     const save = async (e: FormEvent) => {
         e.preventDefault();
@@ -52,6 +54,8 @@ export default function PeopleSettings({ people, loadError, reload }: { people: 
         setForm({ id: p.id, name: p.name, email: p.email_pending ?? p.email ?? '', role: p.role, color: p.color ?? '#64748b', active: p.active, pin: '', oldEmail: p.email_pending ?? p.email ?? '', currentPin: '', oldRole: p.role });
     const editingSelf = form !== null && form.id !== null && form.id === me?.id;
     const emailChanged = editingSelf && form.email.trim() !== form.oldEmail;
+    // A new address waits for the link mailed to it (backend addresses.py)
+    const newEmail = form !== null && form.email.trim() !== '' && form.email.trim() !== form.oldEmail;
     // Other parents are read-only: each parent changes only themselves and the children
 
     return (
@@ -63,13 +67,17 @@ export default function PeopleSettings({ people, loadError, reload }: { people: 
             <p className="text-sm text-slate-400">{t('people.intro')}</p>
             {(error || loadError) && <p className={ERROR}>{error || loadError}</p>}
             {form && (
-                <form onSubmit={save} className="grid gap-2 sm:grid-cols-2">
+                <form ref={formRef} onSubmit={save} className="grid gap-2 sm:grid-cols-2">
                     <label className="text-sm text-slate-400">{t('people.name')}
                         <input className={INPUT} value={form.name} required maxLength={50} onChange={e => setForm({ ...form, name: e.target.value })} />
                     </label>
-                    <label className="text-sm text-slate-400">{t('people.email')}
-                        <input className={INPUT} type="email" value={form.email} maxLength={254} onChange={e => setForm({ ...form, email: e.target.value })} />
-                    </label>
+                    <div className="text-sm text-slate-400">
+                        <label>{t('people.email')}
+                            <input className={INPUT} type="email" value={form.email} maxLength={254} aria-describedby={newEmail ? 'email-hint' : undefined}
+                                onChange={e => setForm({ ...form, email: e.target.value })} />
+                        </label>
+                        {newEmail && <p id="email-hint" className="mt-1 text-xs">{t('people.emailHint')}</p>}
+                    </div>
                     <label className="text-sm text-slate-400">{t('people.role')}
                         <select className={INPUT} value={form.role} onChange={e => setForm({ ...form, role: e.target.value as Role })}>
                             <option value="PARENT">{t('people.roles.PARENT')}</option>
@@ -90,10 +98,14 @@ export default function PeopleSettings({ people, loadError, reload }: { people: 
                         <PinInput id="person-pin" value={form.pin} onChange={pin => setForm({ ...form, pin })} autoComplete="new-password" />
                     </div>}
                     {form.id !== null && (
-                        <label className="flex items-center gap-2 self-end text-sm text-slate-300">
-                            <input type="checkbox" checked={form.active} onChange={e => setForm({ ...form, active: e.target.checked })} />
-                            {t('people.active')}
-                        </label>
+                        <div className="self-end text-sm">
+                            <label className="flex items-center gap-2 text-slate-300">
+                                <input type="checkbox" checked={form.active} aria-describedby="active-hint"
+                                    onChange={e => setForm({ ...form, active: e.target.checked })} />
+                                {t('people.active')}
+                            </label>
+                            <p id="active-hint" className="mt-1 text-xs text-slate-400">{t('people.activeHint')}</p>
+                        </div>
                     )}
                     <div className="flex gap-2 sm:col-span-2">
                         <button type="submit" className={BUTTON} disabled={form.id === null && form.pin.length !== 4}>{t('people.save')}</button>
@@ -111,9 +123,13 @@ export default function PeopleSettings({ people, loadError, reload }: { people: 
                         {p.email_pending && (
                             <span className="min-w-0 break-all text-sm text-amber-300">{t('people.pendingEmail', { email: p.email_pending })}</span>
                         )}
-                        {(p.role !== 'PARENT' || p.id === me?.id) && (
-                            <button type="button" className="ml-auto text-sm text-blue-300 hover:underline" onClick={() => edit(p)}
+                        {(p.role !== 'PARENT' || p.id === me?.id) ? (
+                            // One form at a time: another "Edit" would throw away what is typed in the open one
+                            <button type="button" className="ml-auto text-sm text-blue-300 hover:underline disabled:opacity-30 disabled:no-underline"
+                                disabled={form !== null} onClick={() => edit(p)}
                                 aria-label={t('people.editOf', { name: p.name })}>{t('common.edit')}</button>
+                        ) : (
+                            <span className="ml-auto text-sm text-slate-400">{t('people.ownDetails')}</span>
                         )}
                     </li>
                 ))}

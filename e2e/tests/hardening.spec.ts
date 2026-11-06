@@ -57,6 +57,7 @@ test('other parents are read-only', async ({ page }) => {
     await logIn(page, 'Admin', ADMIN_PIN);
     await addParent(page, ben, '4680');
     await expect(page.getByRole('button', { name: `Edit ${ben}` })).toHaveCount(0);
+    await expect(page.getByRole('listitem').filter({ hasText: ben })).toContainText('changes their own details');
     await expect(page.getByRole('button', { name: 'Edit Admin' })).toBeVisible();
 });
 
@@ -75,7 +76,6 @@ test('logout with next', async ({ page, baseURL }) => {
     await expect(page.getByRole('heading', { name: 'Who are you?' })).toBeVisible();
     await page.getByRole('button', { name: 'Admin', exact: true }).click();
     await page.getByLabel('PIN', { exact: true }).fill(ADMIN_PIN);
-    await page.getByRole('button', { name: 'Log in' }).click();
     await expect(page).toHaveURL(`${baseURL}/settings`);
 });
 

@@ -20,6 +20,7 @@ export default function Start() {
         <>
             <h1 className="mb-4 text-2xl font-semibold">{t('start.hello', { name: person?.name ?? '' })}</h1>
             {error && <p className={ERROR}>{error}</p>}
+            {tiles === null && !error && <p role="status" className="text-slate-400">{t('common.loading')}</p>}
             {tiles && tiles.length === 0 && <p className="text-slate-400">{t('start.none')}</p>}
             <ul className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
                 {(tiles ?? []).map(tile => (

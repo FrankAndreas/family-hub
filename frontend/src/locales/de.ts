@@ -1,7 +1,7 @@
 // German texts (the default); en.ts has the same keys
 const de = {
     app: { title: 'Familie' },
-    common: { cancel: 'Abbrechen', edit: 'Bearbeiten', delete: 'Löschen' },
+    common: { cancel: 'Abbrechen', edit: 'Bearbeiten', delete: 'Löschen', loading: 'Laden …' },
     languages: { de: 'Deutsch', en: 'English' },
     nav: { start: 'Start', settings: 'Einstellungen', logout: 'Abmelden' },
     login: {
@@ -58,6 +58,9 @@ const de = {
         newPinOptional: 'Neue PIN (leer: bleibt)',
         active: 'Aktiv',
         confirmParent: '{{name}} wird Elternteil. Danach kann nur noch {{name}} selbst die eigenen Angaben, die PIN und die Rolle ändern, du nicht mehr. Speichern?',
+        activeHint: 'Nicht aktiv: überall abgemeldet, nicht mehr in der Anmeldung und in den Apps. Die Daten bleiben.',
+        emailHint: 'Die Adresse gilt erst, wenn die Person den Link öffnet, den der Hub an sie schickt (zu Hause, innert 24 Stunden).',
+        ownDetails: 'ändert die eigenen Angaben selbst',
         save: 'Person speichern',
         editOf: '{{name}} bearbeiten',
         roles: { PARENT: 'Elternteil', CHILD: 'Kind' },
@@ -82,6 +85,8 @@ const de = {
         confirmDelete: '«{{name}}» von der Startseite entfernen?',
         appKey: 'App-Schlüssel',
         appKeyHint: 'nur für Apps mit dem Familien-Login, z. B. budget',
+        appKeyFormat: 'Kleinbuchstaben, Ziffern und Bindestriche, 2–20 Zeichen, beginnt mit einem Buchstaben',
+        cfAudienceFormat: '64 Hexadezimalzeichen (0–9, a–f), aus der Access-Anwendung bei Cloudflare',
         who: 'Wer darf sie nutzen',
         shareEmail: 'Die App darf ihre bestätigten E-Mail-Adressen sehen (z. B. für Erinnerungen)',
         cfAudience: 'Cloudflare Access: AUD-Tag der Anwendung dieser App',
