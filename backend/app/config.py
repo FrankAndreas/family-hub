@@ -1,7 +1,6 @@
 import os
 from pathlib import Path
 from typing import Literal
-from zoneinfo import ZoneInfo
 
 Language = Literal["de", "en"]
 
@@ -18,7 +17,3 @@ def data_dir() -> Path:
 def default_language() -> Language:
     """The language of people who haven't picked one; anything but "en" means German."""
     return "en" if env("DEFAULT_LANGUAGE", "de").lower() == "en" else "de"
-
-
-def tz() -> ZoneInfo:
-    return ZoneInfo(env("TZ", "Europe/Zurich"))

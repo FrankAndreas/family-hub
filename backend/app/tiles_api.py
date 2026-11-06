@@ -40,7 +40,7 @@ def _protected(tile: models.Tile, actor: models.Person) -> set[int]:
 def _check_key(db: Session, key: str | None, tile_id: int | None = None) -> None:
     if key is None:
         return
-    other = db.query(models.Tile).filter(models.Tile.app_key == key).first()
+    other = models.Tile.by_key(db, key)
     if other is not None and other.id != tile_id:
         raise api_error(409, "app_key_taken")
 

@@ -9,7 +9,7 @@ from fastapi import APIRouter, Depends, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.orm import Session
 
-from . import auth, cloudflare, config, keys, models, timeutil
+from . import auth, cloudflare, keys, models, timeutil
 from .database import get_db
 
 router = APIRouter(tags=["session"])
@@ -30,7 +30,7 @@ def session_person(person: models.Person) -> dict:
         "email": person.email,
         "role": person.role.value,
         "color": person.color,
-        "language": person.language or config.default_language(),
+        "language": person.language_or_default,
     }
 
 
@@ -40,7 +40,7 @@ def _login(
     """The login as an app passes it: the hub login (Bearer) at home, or the Cloudflare Access token (as Cloudflare
     sent it, Cf-Access-Jwt-Assertion) from outside; else the browser's own login. A Cloudflare token for an app whose
     tile names its Access application counts only when made for that application (hub#12)."""
-    tile = db.query(models.Tile).filter(models.Tile.app_key == app_key).first() if app_key else None
+    tile = models.Tile.by_key(db, app_key) if app_key else None
     audience = tile.cf_audience if tile else None
     if auth.through_tunnel(request):
         # From outside only Cloudflare's token counts: a hub token there may be a stolen home cookie, which the app
@@ -92,7 +92,7 @@ def app_caller(
 
 
 def has_access(db: Session, person: models.Person, app_key: str) -> bool:
-    tile = db.query(models.Tile).filter(models.Tile.app_key == app_key).first()
+    tile = models.Tile.by_key(db, app_key)
     return tile is not None and person in tile.people
 
 

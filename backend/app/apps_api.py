@@ -7,7 +7,7 @@ apps only need to know and show their people."""
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
-from . import config, models, session_api
+from . import models, session_api
 from .database import get_db
 from .errors import api_error
 
@@ -18,7 +18,7 @@ router = APIRouter(tags=["apps"])
 def app_people(key: str, person: models.Person | None = Depends(session_api.app_caller), db: Session = Depends(get_db)):
     if person is None:
         raise api_error(401, "not_logged_in")
-    tile = db.query(models.Tile).filter(models.Tile.app_key == key).first()
+    tile = models.Tile.by_key(db, key)
     if tile is None:
         raise api_error(404, "app_not_found")
     if person not in tile.people:
@@ -29,7 +29,7 @@ def app_people(key: str, person: models.Person | None = Depends(session_api.app_
             "name": p.name,
             "role": p.role.value,
             "color": p.color,
-            "language": p.language or config.default_language(),
+            "language": p.language_or_default,
             **({"email": p.email} if tile.share_email else {}),
         }
         for p in sorted(tile.people, key=lambda p: p.name_key)

@@ -2,8 +2,9 @@ import enum
 from datetime import datetime
 
 from sqlalchemy import Column, DateTime, Enum, ForeignKey, String, Table, UniqueConstraint, false
-from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy.orm import Mapped, Session, mapped_column, relationship
 
+from . import config
 from .database import Base
 from .timeutil import utcnow
 
@@ -11,6 +12,11 @@ from .timeutil import utcnow
 class Role(str, enum.Enum):
     PARENT = "PARENT"
     CHILD = "CHILD"
+
+
+def name_key(name: str) -> str:
+    """What makes two names the same person's: case and surrounding spaces don't count."""
+    return name.strip().casefold()
 
 
 class Person(Base):
@@ -44,6 +50,15 @@ class Person(Base):
     # Part of every login token; raising it ends all of the person's logins (new PIN, log out everywhere)
     token_version: Mapped[int] = mapped_column(default=0)
     created_at: Mapped[datetime] = mapped_column(default=utcnow)
+
+    @property
+    def language_or_default(self) -> str:
+        """The person's language, or DEFAULT_LANGUAGE if they haven't picked one."""
+        return self.language or config.default_language()
+
+    @staticmethod
+    def by_name(db: Session, name: str) -> "Person | None":
+        return db.query(Person).filter(Person.name_key == name_key(name)).first()
 
 
 # Who may use which app (spec 2026-10-30, part A): only tiles with an app key take part
@@ -88,6 +103,10 @@ class Tile(Base):
     @property
     def usage(self) -> list["TileAccess"]:
         return [a for a in self.access if a.first_used_at is not None]
+
+    @staticmethod
+    def by_key(db: Session, key: str) -> "Tile | None":
+        return db.query(Tile).filter(Tile.app_key == key).first()
 
 
 class TileAccess(Base):

@@ -59,11 +59,6 @@ def verify_pin(pin: str, hashed: str) -> bool:
         return False
 
 
-def name_key(name: str) -> str:
-    """What makes two names the same person's: case and surrounding spaces don't count."""
-    return name.strip().casefold()
-
-
 def lock_duration(lockouts: int) -> timedelta:
     """15, 30, 60, ... minutes for the first, second, third lock in a row; at most a day."""
     duration: timedelta = LOCK_DURATION * 2 ** min(max(lockouts - 1, 0), 10)
@@ -146,7 +141,7 @@ def check_pin(db: Session, person: models.Person, pin: str, wrong: Exception, de
 def authenticate(db: Session, name: str, pin: str, device_secret: str | None = None) -> models.Person:
     """The active person with this name and PIN; counts wrong PINs and locks the person after too many."""
     wrong = api_error(status.HTTP_401_UNAUTHORIZED, "wrong_name_or_pin")
-    person = db.query(models.Person).filter(models.Person.name_key == name_key(name)).first()
+    person = models.Person.by_name(db, name)
     if person is None or not person.active:
         raise wrong
     check_pin(db, person, pin, wrong, device_secret)

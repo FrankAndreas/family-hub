@@ -10,7 +10,7 @@ from fastapi.testclient import TestClient
 from helpers import APP_HEADER, THROUGH_TUNNEL, add_person, login, make_person
 from test_pin_reset import ask, confirm, mail, with_email  # noqa: F401
 
-from app import auth, confirm_email, models, pin_reset
+from app import auth, confirm_email, links, mailer, models, pin_reset
 from app.main import app
 from app.timeutil import utcnow
 
@@ -46,15 +46,15 @@ def test_a_link_works_once_even_at_the_same_moment(client, db, mail, monkeypatch
 
 def test_three_per_hour_at_the_same_moment(client, db, mail, monkeypatch):  # noqa: F811
     with_email(db)
-    real = pin_reset.create_link
+    real = links.create
 
-    def slow(db_, person):
+    def slow(db_, kind, person, **fields):
         time.sleep(0.1)
-        return real(db_, person)
+        return real(db_, kind, person, **fields)
 
-    monkeypatch.setattr(pin_reset, "create_link", slow)
+    monkeypatch.setattr(links, "create", slow)
     at_once(6, lambda: device().post("/api/pin-reset", json={"name": "Admin"}))
-    pin_reset.flush()
+    mailer.flush()
     assert len(mail.mails) == pin_reset.MAX_PER_HOUR
 
 
@@ -67,12 +67,12 @@ def test_answer_doesnt_wait_for_the_mail(client, db, mail, monkeypatch):  # noqa
         release.wait(5)
         mail(*args)
 
-    monkeypatch.setattr(pin_reset, "resend_send", slow)
+    monkeypatch.setattr(mailer, "resend_send", slow)
     start = time.monotonic()
     response = client.post("/api/pin-reset", json={"name": "Admin"})
     took = time.monotonic() - start
     release.set()
-    pin_reset.flush()
+    mailer.flush()
     assert response.status_code == 200 and took < 1
     assert len(mail.mails) == 1
 
@@ -93,7 +93,7 @@ def test_new_address_counts_after_confirmation(client, db, mail):  # noqa: F811
     login(client)
     added = add_person(client, "Lena", email="lena@example.org")
     assert (added["email"], added["email_pending"]) == (None, "lena@example.org")
-    pin_reset.flush()
+    mailer.flush()
     assert mail.mails[-1]["to"] == ["lena@example.org"]
     token = confirm_link_token(mail)
     # Not yet a way back in
@@ -109,7 +109,7 @@ def test_new_address_counts_after_confirmation(client, db, mail):  # noqa: F811
 def test_confirm_link_expires(client, db, mail):  # noqa: F811
     login(client)
     add_person(client, "Lena", email="lena@example.org")
-    pin_reset.flush()
+    mailer.flush()
     db.query(models.EmailConfirm).update({models.EmailConfirm.expires_at: utcnow() - timedelta(minutes=1)})
     db.commit()
     assert client.post("/api/email-confirm", json={"token": confirm_link_token(mail)}).status_code == 400
@@ -124,10 +124,10 @@ def test_clearing_an_address_is_immediate(client, db, mail):  # noqa: F811
 def test_address_taken_meanwhile(client, db, mail):  # noqa: F811
     login(client)
     add_person(client, "Lena", email="same@example.org")
-    pin_reset.flush()
+    mailer.flush()
     lena_token = confirm_link_token(mail)
     add_person(client, "Max", email="same@example.org")
-    pin_reset.flush()
+    mailer.flush()
     assert client.post("/api/email-confirm", json={"token": confirm_link_token(mail)}).status_code == 200
     taken = client.post("/api/email-confirm", json={"token": lena_token})
     assert taken.status_code == 409 and taken.json()["detail"] == "email_taken"
@@ -136,7 +136,7 @@ def test_address_taken_meanwhile(client, db, mail):  # noqa: F811
 def test_confirm_not_through_the_tunnel(client, db, mail):  # noqa: F811
     login(client)
     add_person(client, "Lena", email="lena@example.org")
-    pin_reset.flush()
+    mailer.flush()
     refused = client.post("/api/email-confirm", json={"token": confirm_link_token(mail)}, headers=THROUGH_TUNNEL)
     assert refused.status_code == 403
 
@@ -156,10 +156,10 @@ def test_saving_again_with_the_waiting_address_changes_nothing(client, db, mail)
     login(client)
     me = client.get("/api/me").json()["id"]
     client.patch(f"/api/people/{me}", json={"email": "admin@example.org", "current_pin": "1234"})
-    pin_reset.flush()
+    mailer.flush()
     sent = len(mail.mails)
     # The form sends the address it shows: the waiting one; no PIN needed, and no new mail
     again = client.patch(f"/api/people/{me}", json={"email": "admin@example.org", "color": "#123456"})
-    pin_reset.flush()
+    mailer.flush()
     assert again.status_code == 200 and again.json()["email_pending"] == "admin@example.org"
     assert len(mail.mails) == sent
