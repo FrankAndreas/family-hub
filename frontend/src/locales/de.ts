@@ -113,7 +113,7 @@ const de = {
         email_link_invalid: 'Dieser Link ist abgelaufen oder wurde schon benutzt. Speichere die Adresse nochmals für einen neuen.',
         other_parent: 'Jeder Elternteil ändert nur die eigenen Angaben.',
         pin_needed: 'Gib deine aktuelle PIN ein, um deine E-Mail-Adresse zu ändern.',
-        reset_link_invalid: 'Dieser Link ist abgelaufen. Verlange einen neuen.',
+        reset_link_invalid: 'Dieser Link ist ungültig oder abgelaufen. Verlange einen neuen.',
         own_pin_needs_old_pin: 'Ändere deine eigene PIN unter «Meine PIN», mit der aktuellen.',
         parents_only: 'Nur für Eltern.',
         name_taken: 'Diesen Namen gibt es schon.',

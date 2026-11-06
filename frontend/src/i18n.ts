@@ -20,11 +20,16 @@ i18n.use(initReactI18next).init({
     fallbackLng: 'de',
     interpolation: { escapeValue: false },
 });
-document.documentElement.lang = i18n.language;
+// The page's language and the tab's title ("Familie" / "Family") follow the language shown
+function showLanguage(lang: string) {
+    document.documentElement.lang = lang;
+    document.title = i18n.t('app.title', { lng: lang });
+}
+showLanguage(i18n.language);
 
 export function applyLanguage(lang: Language) {
     if (i18n.language !== lang) i18n.changeLanguage(lang);
-    document.documentElement.lang = lang;
+    showLanguage(lang);
 }
 
 export default i18n;

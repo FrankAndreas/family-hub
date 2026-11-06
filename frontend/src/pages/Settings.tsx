@@ -34,6 +34,14 @@ export default function Settings() {
     // Language and "log out everywhere"
     const [otherError, setOtherError] = useState('');
 
+    // Typing again clears the last outcome ("PIN changed" or an error), so it never stays next to new input. No timer:
+    // a message that goes away by itself may be gone before someone has read it
+    const typed = (set: (pin: string) => void) => (pin: string) => {
+        set(pin);
+        setMessage('');
+        setError('');
+    };
+
     const changePin = async (e: FormEvent) => {
         e.preventDefault();
         if (newPin !== againPin) {
@@ -86,15 +94,15 @@ export default function Settings() {
                 <form onSubmit={changePin} className="grid gap-2 sm:grid-cols-3">
                     <div className="text-sm text-slate-400">
                         <label htmlFor="old-pin">{t('settings.oldPin')}</label>
-                        <PinInput id="old-pin" value={oldPin} onChange={setOldPin} />
+                        <PinInput id="old-pin" value={oldPin} onChange={typed(setOldPin)} />
                     </div>
                     <div className="text-sm text-slate-400">
                         <label htmlFor="new-pin">{t('settings.newPin')}</label>
-                        <PinInput id="new-pin" value={newPin} onChange={setNewPin} autoComplete="new-password" />
+                        <PinInput id="new-pin" value={newPin} onChange={typed(setNewPin)} autoComplete="new-password" />
                     </div>
                     <div className="text-sm text-slate-400">
                         <label htmlFor="again-pin">{t('settings.againPin')}</label>
-                        <PinInput id="again-pin" value={againPin} onChange={setAgainPin} autoComplete="new-password" />
+                        <PinInput id="again-pin" value={againPin} onChange={typed(setAgainPin)} autoComplete="new-password" />
                     </div>
                     <button type="submit" className={`${BUTTON} justify-self-start sm:col-span-3`}
                         disabled={oldPin.length !== 4 || newPin.length !== 4 || againPin.length !== 4}>
