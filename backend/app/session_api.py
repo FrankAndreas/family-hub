@@ -3,14 +3,17 @@
 An app reads the login (the `hub_session` cookie at home), may check its signature itself with the JWKS, and asks
 /api/session (briefly cached) to honour "log out everywhere", a new PIN and deactivated people."""
 
+from datetime import timedelta
+
 from fastapi import APIRouter, Depends, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.orm import Session
 
-from . import auth, cloudflare, config, keys, models
+from . import auth, cloudflare, config, keys, models, timeutil
 from .database import get_db
 
 router = APIRouter(tags=["session"])
+USE_RESOLUTION = timedelta(hours=1)
 _bearer = HTTPBearer(auto_error=False)
 
 
@@ -49,7 +52,23 @@ def _login(
         person = cloudflare.person_for(request, db, audience)
     else:
         person = auth.current_person_or_none(request, db)
+    if person is not None and tile is not None:
+        _note_use(db, tile, person)
     return person
+
+
+def _note_use(db: Session, tile: models.Tile, person: models.Person) -> None:
+    """The app asked for its key with this person's login: they use it (see tiles_api.change_tile). Kept to the hour,
+    so not every page of an app writes."""
+    access = db.get(models.TileAccess, (tile.id, person.id))
+    if access is None:
+        return
+    now = timeutil.utcnow()
+    if access.last_used_at is not None and now - access.last_used_at < USE_RESOLUTION:
+        return
+    access.first_used_at = access.first_used_at or now
+    access.last_used_at = now
+    db.commit()
 
 
 def caller(

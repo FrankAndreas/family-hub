@@ -1,7 +1,7 @@
 import enum
 from datetime import datetime
 
-from sqlalchemy import Column, Enum, ForeignKey, String, Table, UniqueConstraint, false
+from sqlalchemy import Column, DateTime, Enum, ForeignKey, String, Table, UniqueConstraint, false
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .database import Base
@@ -52,6 +52,11 @@ tile_access = Table(
     Base.metadata,
     Column("tile_id", ForeignKey("tiles.id", ondelete="CASCADE"), primary_key=True),
     Column("person_id", ForeignKey("people.id", ondelete="CASCADE"), primary_key=True),
+    # When the person first and last used the app (its key asked for with their login; None: never). Only a parent who
+    # used the app is protected against another parent: unticking someone who never did takes nothing from them. Last
+    # use is kept to the hour, so an app's every page doesn't write. Unticking or a new key forgets it
+    Column("first_used_at", DateTime, nullable=True),
+    Column("last_used_at", DateTime, nullable=True),
 )
 
 
@@ -77,6 +82,23 @@ class Tile(Base):
     # made for that application. None: any of CF_AUDIENCE, as for the hub itself
     cf_audience: Mapped[str | None] = mapped_column(String(64))
     people: Mapped[list[Person]] = relationship(secondary=tile_access, order_by=Person.id)
+    # The same rows with when each person used the app; read only, `people` changes them
+    access: Mapped[list["TileAccess"]] = relationship(viewonly=True, order_by="TileAccess.person_id")
+
+    @property
+    def usage(self) -> list["TileAccess"]:
+        return [a for a in self.access if a.first_used_at is not None]
+
+
+class TileAccess(Base):
+    """A row of tile_access: who may use an app, and when they used it."""
+
+    __table__ = tile_access
+
+    tile_id: Mapped[int]
+    person_id: Mapped[int]
+    first_used_at: Mapped[datetime | None]
+    last_used_at: Mapped[datetime | None]
 
 
 class KnownDevice(Base):

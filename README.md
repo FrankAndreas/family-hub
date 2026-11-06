@@ -17,6 +17,9 @@ same stack and look. German by default, English per person.
 - **Own PIN only**: each parent changes their own PIN and details and the children's; never another parent's. A
   forgotten PIN is reset with a link to the person's e-mail address, or from the NAS as the last resort. An address
   counts only once the link mailed to it was opened, so nobody can hand someone else's address to a family member.
+  Nor can a parent take an app away from another parent who has used it: not untick them, delete the app or change its
+  key. Someone who never used an app loses nothing, so they can be unticked and a key typed wrong corrected. The app
+  settings show when each person last used an app (to the hour; forgotten when the key changes or they are unticked).
 - **Managing happens at home**: people, PINs and apps can't be changed from outside, so a mailbox someone broke into
   (past Cloudflare Access) can't take over the family's accounts.
 - **Start page**: at home every app, linking to its home address; outside only the apps with an outside address. An
