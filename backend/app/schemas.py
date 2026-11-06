@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Annotated
 
-from pydantic import AfterValidator, BaseModel, ConfigDict, Field, field_serializer, field_validator
+from pydantic import AfterValidator, AliasChoices, BaseModel, ConfigDict, Field, field_serializer, field_validator
 
 from .config import Language
 from .models import Role
@@ -40,6 +40,43 @@ class PersonOut(BaseModel):
     language_chosen: bool
     # Managing people, PINs and apps happens at home only: the settings page shows it outside
     at_home: bool = True
+    # Whether the parent asking may change this person: themselves and the children, never another parent
+    can_edit: bool = True
+
+
+# What the apps get (README "For apps"): the same person for /api/session and /api/apps/<key>/people
+
+
+class AppPerson(BaseModel):
+    """A person as an app sees it. `email` only for an app whose tile allows it: left out otherwise, not null."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    name: str
+    role: Role
+    color: str | None
+    # The person's choice or the default; read from a Person, or from this model's own output
+    language: str = Field(validation_alias=AliasChoices("language_or_default", "language"))
+    email: str | None = None
+
+
+class SessionOut(BaseModel):
+    """Whether a login still counts. `access` (with ?app=<key>) is left out without a key."""
+
+    valid: bool
+    person: AppPerson | None
+    access: bool | None = None
+
+
+class TileLink(BaseModel):
+    """A tile on the start page: the address for where one is (home or outside)."""
+
+    id: int
+    name: str
+    icon: str
+    url: str
+    home_only: bool
 
 
 class PersonIn(BaseModel):
@@ -138,6 +175,8 @@ class TileUsage(BaseModel):
 
 
 class TileOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: int
     name: str
     icon: str
@@ -150,6 +189,9 @@ class TileOut(BaseModel):
     cf_audience: str | None
     # Who used the app under its current key, and when
     usage: list[TileUsage]
+    # The other parents who used it: only they can untick themselves, and meanwhile the app keeps its key and can't
+    # be deleted (tiles_api.locked_people). For the parent asking
+    locked_people: list[int] = []
 
     @field_validator("people", mode="before")
     @classmethod

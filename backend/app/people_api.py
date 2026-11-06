@@ -12,9 +12,16 @@ from .errors import api_error
 router = APIRouter(tags=["people"])
 
 
-def person_out(person: models.Person, at_home: bool = True) -> schemas.PersonOut:
+def may_change(actor: models.Person, person: models.Person) -> bool:
+    """A parent changes the children and themselves, never another parent (spec 2026-10-30 hub hardening): between
+    separated parents, one must not take over the other's account."""
+    return person.role != models.Role.PARENT or person.id == actor.id
+
+
+def person_out(person: models.Person, at_home: bool = True, can_edit: bool = True) -> schemas.PersonOut:
     return schemas.PersonOut(
         at_home=at_home,
+        can_edit=can_edit,
         id=person.id,
         name=person.name,
         email=person.email,
@@ -105,9 +112,11 @@ def _check_free(db: Session, name: str | None, email: str | None, except_id: int
         raise api_error(409, "email_taken")
 
 
-@router.get("/people", response_model=list[schemas.PersonOut], dependencies=[Depends(auth.require_parent)])
-def list_people(db: Session = Depends(get_db)):
-    return [person_out(p) for p in db.query(models.Person).order_by(models.Person.name_key)]
+@router.get("/people", response_model=list[schemas.PersonOut])
+def list_people(actor: models.Person = Depends(auth.require_parent), db: Session = Depends(get_db)):
+    return [
+        person_out(p, can_edit=may_change(actor, p)) for p in db.query(models.Person).order_by(models.Person.name_key)
+    ]
 
 
 @router.post("/people", status_code=201, response_model=schemas.PersonOut, dependencies=[Depends(auth.require_parent)])
@@ -156,9 +165,7 @@ def _check_last_parent(db: Session, person: models.Person, body: schemas.PersonP
 
 
 def _not_another_parent(actor: models.Person, person: models.Person) -> None:
-    """A parent changes the children and themselves, never another parent (spec 2026-10-30 hub hardening): between
-    separated parents, one must not take over the other's account."""
-    if person.role == models.Role.PARENT and person.id != actor.id:
+    if not may_change(actor, person):
         raise api_error(403, "other_parent")
 
 

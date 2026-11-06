@@ -30,11 +30,19 @@ def _people(db: Session, ids: list[int]) -> list[models.Person]:
     return found
 
 
-def _protected(tile: models.Tile, actor: models.Person) -> set[int]:
+def locked_people(tile: models.Tile, actor: models.Person) -> set[int]:
     """The other parents who used the app under its current key: only they themselves can untick themselves, and
     while they are ticked the app can't be deleted nor its key changed. Someone who never used it loses nothing."""
     parents = {p.id for p in tile.people if p.role == models.Role.PARENT and p.id != actor.id}
     return parents & {a.person_id for a in tile.usage}
+
+
+def tile_out(tile: models.Tile, actor: models.Person) -> schemas.TileOut:
+    """The tile for the parent asking, with what they can't change: the settings page shows it, without rules of its
+    own."""
+    out = schemas.TileOut.model_validate(tile)
+    out.locked_people = sorted(locked_people(tile, actor))
+    return out
 
 
 def _check_key(db: Session, key: str | None, tile_id: int | None = None) -> None:
@@ -45,30 +53,31 @@ def _check_key(db: Session, key: str | None, tile_id: int | None = None) -> None
         raise api_error(409, "app_key_taken")
 
 
-@router.get("/tiles")
+@router.get("/tiles", response_model=list[schemas.TileLink])
 def tiles(request: Request, person: models.Person = Depends(auth.current_person), db: Session = Depends(get_db)):
     outside = auth.through_tunnel(request)
     return [
-        {
-            "id": t.id,
-            "name": t.name,
-            "icon": t.icon,
-            "url": t.remote_url if outside else t.local_url,
-            "home_only": t.remote_url is None,
-        }
+        schemas.TileLink(
+            id=t.id,
+            name=t.name,
+            icon=t.icon,
+            # Outside only tiles with an outside address are listed (below): never a home address there
+            url=(t.remote_url or "") if outside else t.local_url,
+            home_only=t.remote_url is None,
+        )
         for t in _ordered(db)
         # Outside only apps with an outside address; an app with a key only for the people who may use it
         if (not outside or t.remote_url) and (t.app_key is None or person in t.people)
     ]
 
 
-@router.get("/tiles/manage", response_model=list[schemas.TileOut], dependencies=[Depends(auth.require_parent)])
-def manage_tiles(db: Session = Depends(get_db)):
-    return _ordered(db)
+@router.get("/tiles/manage", response_model=list[schemas.TileOut])
+def manage_tiles(actor: models.Person = Depends(auth.require_parent), db: Session = Depends(get_db)):
+    return [tile_out(t, actor) for t in _ordered(db)]
 
 
-@router.post("/tiles", status_code=201, response_model=schemas.TileOut, dependencies=[Depends(auth.require_parent)])
-def add_tile(body: schemas.TileIn, db: Session = Depends(get_db)):
+@router.post("/tiles", status_code=201, response_model=schemas.TileOut)
+def add_tile(body: schemas.TileIn, actor: models.Person = Depends(auth.require_parent), db: Session = Depends(get_db)):
     _check_key(db, body.app_key)
     last = db.query(models.Tile).order_by(models.Tile.position.desc()).first()
     tile = models.Tile(
@@ -78,7 +87,7 @@ def add_tile(body: schemas.TileIn, db: Session = Depends(get_db)):
     )
     db.add(tile)
     db.commit()
-    return tile
+    return tile_out(tile, actor)
 
 
 @router.patch("/tiles/{tile_id}", response_model=schemas.TileOut)
@@ -92,7 +101,7 @@ def change_tile(
     # A parent can't take an app away from another parent who uses it (security review 2026-10-30): not by unticking
     # them, and not by moving the app's key to another tile. A key typed wrong or someone who never opened the app can
     # be corrected: that takes nothing from anyone
-    protected = _protected(tile, actor)
+    protected = locked_people(tile, actor)
     if protected and body.people is not None and not protected <= set(body.people):
         raise api_error(403, "tile_other_parent")
     key_changes = "app_key" in body.model_fields_set and body.app_key != tile.app_key
@@ -119,13 +128,13 @@ def change_tile(
             .values(first_used_at=None, last_used_at=None)
         )
     db.commit()
-    return tile
+    return tile_out(tile, actor)
 
 
 @router.delete("/tiles/{tile_id}")
 def delete_tile(tile_id: int, actor: models.Person = Depends(auth.require_parent), db: Session = Depends(get_db)):
     tile = _get(db, tile_id)
-    if _protected(tile, actor):
+    if locked_people(tile, actor):
         raise api_error(403, "tile_other_parent")
     db.delete(tile)
     db.commit()

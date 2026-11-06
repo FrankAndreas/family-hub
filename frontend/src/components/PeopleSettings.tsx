@@ -123,7 +123,7 @@ export default function PeopleSettings({ people, loadError, reload }: { people: 
                         {p.email_pending && (
                             <span className="min-w-0 break-all text-sm text-amber-300">{t('people.pendingEmail', { email: p.email_pending })}</span>
                         )}
-                        {(p.role !== 'PARENT' || p.id === me?.id) ? (
+                        {p.can_edit ? (
                             // One form at a time: another "Edit" would throw away what is typed in the open one
                             <button type="button" className={`${TOUCH} ml-auto text-sm text-blue-300 hover:underline disabled:opacity-30 disabled:no-underline`}
                                 disabled={form !== null} onClick={() => edit(p)}

@@ -42,7 +42,9 @@ An app that switches to the hub drops its own PINs and asks the hub who is logge
 - Neither header nor cookie belongs in an app's logs: each is a login to the hub, a parent's with full rights.
 
 The answer is `{"valid": true, "person": {"id", "name", "email", "role", "color", "language"}}` or
-`{"valid": false, "person": null}`. Cache it for a minute or so.
+`{"valid": false, "person": null}`. Cache it for a minute or so. The answers' exact form is in
+`backend/app/schemas.py` (`SessionOut`, `AppPerson`), and in the backend's OpenAPI document (`/openapi.json` on the
+backend itself; nginx doesn't pass it on).
 
 **Access per app.** In Einstellungen → Apps, an app that uses the family login gets a key (e.g. `budget`) and the
 people who may use it; only they see its tile. The app asks `GET <hub>/api/session?app=<key>`: the answer adds
