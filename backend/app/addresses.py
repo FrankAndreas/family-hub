@@ -7,20 +7,16 @@ when the mail is lost, `python -m app.confirm_email <name>` prints the link on t
 token or address reaches a log line, and the token sits after "#".
 """
 
-import hashlib
-import secrets
-import threading
 from datetime import timedelta
 
 from sqlalchemy.orm import Session
 
-from . import config, models, pin_reset
+from . import links, mailer, models, pin_reset
 from .errors import api_error
-from .timeutil import utcnow
 
 LINK_LIFETIME = timedelta(hours=24)
 MAX_PER_HOUR = 3
-_limit_lock = threading.Lock()
+KIND = links.Kind(models.EmailConfirm, "confirm-email", LINK_LIFETIME, MAX_PER_HOUR)
 
 TEXTS = {
     "de": {
@@ -44,16 +40,6 @@ TEXTS = {
 }
 
 
-def _hash(token: str) -> str:
-    return hashlib.sha256(token.encode()).hexdigest()
-
-
-def _end_links(db: Session, person: models.Person) -> None:
-    db.query(models.EmailConfirm).filter(
-        models.EmailConfirm.person_id == person.id, models.EmailConfirm.used_at.is_(None)
-    ).update({models.EmailConfirm.used_at: utcnow()})
-
-
 def set_address(db: Session, person: models.Person, email: str | None) -> bool:
     """A parent set the person's address (cleaned, casefolded). Clearing it counts at once; a new one waits for its
     confirmation. Returns whether a confirmation mail is due (send_confirmation after the commit)."""
@@ -63,10 +49,10 @@ def set_address(db: Session, person: models.Person, email: str | None) -> bool:
             pin_reset.end_links(db, person)
         person.email = email
         person.email_pending = None
-        _end_links(db, person)
+        links.end_open(db, KIND, person)
         return False
     person.email_pending = email
-    _end_links(db, person)
+    links.end_open(db, KIND, person)
     # The old address may be the reason for the change: its reset links stop working now
     pin_reset.end_links(db, person)
     return True
@@ -75,63 +61,28 @@ def set_address(db: Session, person: models.Person, email: str | None) -> bool:
 def create_link(db: Session, person: models.Person) -> str:
     """A confirmation link for the person's pending address: the full address, or the path without HUB_PUBLIC_URL."""
     assert person.email_pending is not None
-    token = secrets.token_urlsafe(32)
-    now = utcnow()
-    db.add(
-        models.EmailConfirm(
-            person_id=person.id,
-            email=person.email_pending,
-            token_hash=_hash(token),
-            created_at=now,
-            expires_at=now + LINK_LIFETIME,
-        )
-    )
-    db.commit()
-    return f"{config.env('HUB_PUBLIC_URL').rstrip('/')}/confirm-email#token={token}"
+    return links.create(db, KIND, person, email=person.email_pending)
 
 
-def send_confirmation(db: Session, person: models.Person, send: pin_reset.Sender | None = None) -> None:
+def send_confirmation(db: Session, person: models.Person) -> None:
     """Mail a confirmation link to the person's pending address, if mails are set up and the hourly limit allows."""
-    if not pin_reset.is_configured() or not person.email_pending:
+    to = person.email_pending
+    if not mailer.is_configured() or not to:
         return
-    with _limit_lock:
-        recent = (
-            db.query(models.EmailConfirm)
-            .filter(
-                models.EmailConfirm.person_id == person.id,
-                models.EmailConfirm.created_at > utcnow() - timedelta(hours=1),
-            )
-            .count()
-        )
-        if recent >= MAX_PER_HOUR:
-            return
-        to = person.email_pending
-        link = create_link(db, person)
-    texts = TEXTS[person.language or config.default_language()]
-    text, html_body = pin_reset.mail_bodies(texts["body"].format(name=person.name, link=link), link)
-    pin_reset.send_later(
-        send or pin_reset.resend_send, config.env("MAIL_FROM"), [to], texts["subject"], text, html_body, "Confirmation"
-    )
+    link = links.create_limited(db, KIND, person, email=to)
+    if link is None:
+        return
+    texts = TEXTS[person.language_or_default]
+    text = texts["body"].format(name=person.name, link=link)
+    mailer.send_link(to, texts["subject"], text, link, "Confirmation")
 
 
 def confirm(db: Session, token: str) -> None:
     """The address the link was mailed to becomes the person's address."""
     invalid = api_error(400, "email_link_invalid")
-    now = utcnow()
-    # Claimed in one step: of two uses at the same moment, only one finds the link unused
-    claimed = (
-        db.query(models.EmailConfirm)
-        .filter(
-            models.EmailConfirm.token_hash == _hash(token),
-            models.EmailConfirm.used_at.is_(None),
-            models.EmailConfirm.expires_at >= now,
-        )
-        .update({models.EmailConfirm.used_at: now})
-    )
-    db.commit()
-    if claimed != 1:
+    link = links.claim(db, KIND, token)
+    if not isinstance(link, models.EmailConfirm):
         raise invalid
-    link = db.query(models.EmailConfirm).filter(models.EmailConfirm.token_hash == _hash(token)).one()
     person = db.get(models.Person, link.person_id)
     if person is None or not person.active or person.email_pending != link.email:
         raise invalid
@@ -140,6 +91,6 @@ def confirm(db: Session, token: str) -> None:
         raise api_error(409, "email_taken")
     person.email = link.email
     person.email_pending = None
-    _end_links(db, person)
+    links.end_open(db, KIND, person)
     pin_reset.end_links(db, person)
     db.commit()

@@ -6,7 +6,7 @@ also without the mail settings.
 
 import sys
 
-from . import addresses, auth, database, models
+from . import addresses, database, models
 
 
 def main(argv: list[str]) -> int:
@@ -14,7 +14,7 @@ def main(argv: list[str]) -> int:
         print("Usage: python -m app.confirm_email <name>", file=sys.stderr)
         return 2
     with database.SessionLocal() as db:
-        person = db.query(models.Person).filter(models.Person.name_key == auth.name_key(argv[0])).first()
+        person = models.Person.by_name(db, argv[0])
         if person is None or not person.active or not person.email_pending:
             print(f"No active person named {argv[0]!r} with an address waiting for confirmation", file=sys.stderr)
             return 1

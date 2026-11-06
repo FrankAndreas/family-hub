@@ -20,7 +20,7 @@ def seed_admin(db: Session) -> str | None:
         pin = f"{secrets.randbelow(10_000):04d}"
     db.add(
         models.Person(
-            name="Admin", name_key=auth.name_key("Admin"), pin_hash=auth.get_pin_hash(pin), role=models.Role.PARENT
+            name="Admin", name_key=models.name_key("Admin"), pin_hash=auth.get_pin_hash(pin), role=models.Role.PARENT
         )
     )
     db.commit()

@@ -6,7 +6,7 @@ settings and for people without an e-mail address.
 
 import sys
 
-from . import auth, database, models, pin_reset
+from . import database, models, pin_reset
 
 
 def main(argv: list[str]) -> int:
@@ -14,7 +14,7 @@ def main(argv: list[str]) -> int:
         print("Usage: python -m app.reset_pin <name>", file=sys.stderr)
         return 2
     with database.SessionLocal() as db:
-        person = db.query(models.Person).filter(models.Person.name_key == auth.name_key(argv[0])).first()
+        person = models.Person.by_name(db, argv[0])
         if person is None or not person.active:
             print(f"No active person named {argv[0]!r}", file=sys.stderr)
             return 1

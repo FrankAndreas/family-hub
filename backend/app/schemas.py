@@ -1,14 +1,24 @@
 from datetime import datetime
-from typing import Literal
+from typing import Annotated
 
-from pydantic import BaseModel, ConfigDict, Field, field_serializer, field_validator
+from pydantic import AfterValidator, BaseModel, ConfigDict, Field, field_serializer, field_validator
 
+from .config import Language
 from .models import Role
+
+PIN = r"^\d{4}$"
+COLOR = r"^#[0-9a-fA-F]{6}$"
+# Enough to catch typos; Cloudflare Access is what checks the address really works
+EMAIL = r"^[^@\s]+@[^@\s]+\.[^@\s]+$"
+
+
+# Stored casefolded: Cloudflare's "Lena@Example.ch" is the same person as "lena@example.ch"
+Email = Annotated[str, Field(max_length=254, pattern=EMAIL), AfterValidator(str.casefold)]
 
 
 class LoginIn(BaseModel):
     name: str = Field(min_length=1, max_length=50)
-    pin: str = Field(pattern=r"^\d{4}$")
+    pin: str = Field(pattern=PIN)
 
 
 class PersonPublic(BaseModel):
@@ -32,30 +42,24 @@ class PersonOut(BaseModel):
     at_home: bool = True
 
 
-PIN = r"^\d{4}$"
-COLOR = r"^#[0-9a-fA-F]{6}$"
-# Enough to catch typos; Cloudflare Access is what checks the address really works
-EMAIL = r"^[^@\s]+@[^@\s]+\.[^@\s]+$"
-
-
 class PersonIn(BaseModel):
     name: str = Field(min_length=1, max_length=50)
     pin: str = Field(pattern=PIN)
     role: Role = Role.CHILD
-    email: str | None = Field(default=None, max_length=254, pattern=EMAIL)
+    email: Email | None = None
     color: str | None = Field(default=None, pattern=COLOR)
-    language: Literal["de", "en"] | None = None
+    language: Language | None = None
 
 
 class PersonPatch(BaseModel):
     name: str | None = Field(default=None, min_length=1, max_length=50)
     # The parent's own PIN, needed to change their own e-mail address (the way back in when the PIN is forgotten)
-    current_pin: str | None = Field(default=None, pattern=r"^\d{4}$")
+    current_pin: str | None = Field(default=None, pattern=PIN)
     role: Role | None = None
     active: bool | None = None
-    email: str | None = Field(default=None, max_length=254, pattern=EMAIL)
+    email: Email | None = None
     color: str | None = Field(default=None, pattern=COLOR)
-    language: Literal["de", "en"] | None = None
+    language: Language | None = None
 
 
 class PinIn(BaseModel):
@@ -81,7 +85,7 @@ class OwnPinIn(BaseModel):
 
 
 class MePatch(BaseModel):
-    language: Literal["de", "en"] | None = None
+    language: Language | None = None
     color: str | None = Field(default=None, pattern=COLOR)
 
 

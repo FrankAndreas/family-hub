@@ -9,7 +9,7 @@ import pytest
 from fastapi.testclient import TestClient
 from helpers import ADMIN, ADMIN_PIN, APP_HEADER, THROUGH_TUNNEL, login, make_person
 
-from app import models, pin_reset, reset_pin
+from app import mailer, models, pin_reset, reset_pin
 from app.main import app
 from app.timeutil import utcnow
 
@@ -39,7 +39,7 @@ def mail(monkeypatch):
     monkeypatch.setenv("MAIL_FROM", "hub@example.org")
     monkeypatch.setenv("HUB_PUBLIC_URL", "https://home.local.example.ch")
     outbox = Outbox()
-    monkeypatch.setattr(pin_reset, "resend_send", outbox)
+    monkeypatch.setattr(mailer, "resend_send", outbox)
     return outbox
 
 
@@ -53,7 +53,7 @@ def with_email(db, name=ADMIN, email="admin@example.org"):
 def ask(client, name=ADMIN):
     response = client.post("/api/pin-reset", json={"name": name})
     # The mail goes out after the answer
-    pin_reset.flush()
+    mailer.flush()
     return response
 
 
@@ -131,7 +131,7 @@ def test_off_without_settings(client, db, monkeypatch):
     for name in ("RESEND_API_KEY", "MAIL_FROM", "HUB_PUBLIC_URL"):
         monkeypatch.delenv(name, raising=False)
     sent = []
-    monkeypatch.setattr(pin_reset, "resend_send", lambda *args: sent.append(args))
+    monkeypatch.setattr(mailer, "resend_send", lambda *args: sent.append(args))
     with_email(db)
     assert client.get("/api/config").json()["pin_reset"] is False
     assert ask(client).status_code == 200

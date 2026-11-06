@@ -28,7 +28,7 @@ def make_person(db, name, pin="5678", role="CHILD", email=None, active=True, col
 
     person = models.Person(
         name=name,
-        name_key=auth.name_key(name),
+        name_key=models.name_key(name),
         email=email.casefold() if email else None,
         pin_hash=auth.get_pin_hash(pin),
         role=models.Role(role),

@@ -5,7 +5,7 @@ import threading
 from fastapi import APIRouter, Depends, Request, Response
 from sqlalchemy.orm import Session
 
-from . import addresses, auth, config, models, pin_reset, schemas
+from . import addresses, auth, config, mailer, models, pin_reset, schemas
 from .database import get_db
 from .errors import api_error
 
@@ -22,7 +22,7 @@ def person_out(person: models.Person, at_home: bool = True) -> schemas.PersonOut
         role=person.role,
         active=person.active,
         color=person.color,
-        language=person.language or config.default_language(),
+        language=person.language_or_default,
         language_chosen=person.language is not None,
     )
 
@@ -30,7 +30,7 @@ def person_out(person: models.Person, at_home: bool = True) -> schemas.PersonOut
 @router.get("/config")
 def public_config():
     """What the login screen needs before anyone is logged in: the language for browsers that speak neither."""
-    return {"default_language": config.default_language(), "pin_reset": pin_reset.is_configured()}
+    return {"default_language": config.default_language(), "pin_reset": mailer.is_configured()}
 
 
 @router.post("/pin-reset", dependencies=[Depends(auth.require_home)])
@@ -99,9 +99,9 @@ def _check_free(db: Session, name: str | None, email: str | None, except_id: int
     others = db.query(models.Person)
     if except_id is not None:
         others = others.filter(models.Person.id != except_id)
-    if name is not None and others.filter(models.Person.name_key == auth.name_key(name)).first():
+    if name is not None and others.filter(models.Person.name_key == models.name_key(name)).first():
         raise api_error(409, "name_taken")
-    if email and others.filter(models.Person.email == email.strip().casefold()).first():
+    if email and others.filter(models.Person.email == email).first():
         raise api_error(409, "email_taken")
 
 
@@ -115,7 +115,7 @@ def add_person(body: schemas.PersonIn, db: Session = Depends(get_db)):
     _check_free(db, body.name, body.email)
     person = models.Person(
         name=body.name.strip(),
-        name_key=auth.name_key(body.name),
+        name_key=models.name_key(body.name),
         pin_hash=auth.get_pin_hash(body.pin),
         role=body.role,
         color=body.color,
@@ -123,7 +123,7 @@ def add_person(body: schemas.PersonIn, db: Session = Depends(get_db)):
     )
     db.add(person)
     db.flush()
-    confirm_due = addresses.set_address(db, person, body.email.strip().casefold() if body.email else None)
+    confirm_due = addresses.set_address(db, person, body.email)
     db.commit()
     if confirm_due:
         addresses.send_confirmation(db, person)
@@ -172,7 +172,7 @@ def change_person(
     person = _get(db, person_id)
     _not_another_parent(actor, person)
     fields = body.model_fields_set
-    new_email = (body.email.strip().casefold() if body.email else None) if "email" in fields else person.email
+    new_email = body.email if "email" in fields else person.email
     # The address the form shows may be the one still waiting for confirmation: saving it again changes nothing
     if "email" in fields and new_email is not None and new_email == person.email_pending:
         fields = fields - {"email"}
@@ -187,7 +187,7 @@ def change_person(
         db.refresh(person)
         _check_last_parent(db, person, body)
         if body.name is not None:
-            person.name, person.name_key = body.name.strip(), auth.name_key(body.name)
+            person.name, person.name_key = body.name.strip(), models.name_key(body.name)
         confirm_due = "email" in fields and addresses.set_address(db, person, new_email)
         if body.role is not None:
             person.role = body.role
