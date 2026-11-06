@@ -1,4 +1,5 @@
-import { useEffect, useState, type FormEvent } from 'react';
+import axios from 'axios';
+import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import api, { errorMessage } from '../api';
@@ -6,7 +7,7 @@ import { useAuth } from '../AuthContext';
 import PinInput from '../components/PinInput';
 import { safeNext } from '../next';
 import type { Tile } from '../types';
-import { BUTTON, CARD, ERROR } from '../ui';
+import { BUTTON, BUTTON_SECONDARY, CARD, ERROR } from '../ui';
 
 interface Name { name: string; color: string | null }
 
@@ -19,6 +20,8 @@ export default function Login() {
     const [names, setNames] = useState<Name[] | null>(null);
     // The PIN login is refused through Cloudflare: the person's e-mail isn't in the family list
     const [outside, setOutside] = useState(false);
+    // The names couldn't be loaded (hub restarting, NAS out of reach): say so instead of "not in the family list"
+    const [loadError, setLoadError] = useState('');
     const [chosen, setChosen] = useState<string | null>(null);
     const [pin, setPin] = useState('');
     const [error, setError] = useState('');
@@ -26,12 +29,17 @@ export default function Login() {
     const [canReset, setCanReset] = useState(false);
     const [resetSent, setResetSent] = useState(false);
 
-    useEffect(() => {
+    const loadNames = useCallback(() => {
         api.get<Name[]>('/api/people/public')
             .then(res => setNames(res.data))
-            .catch(() => setOutside(true));
+            .catch(err => {
+                // Only the backend's own refusal means "outside" (auth.require_home)
+                if (axios.isAxiosError(err) && err.response?.status === 403 && err.response.data?.detail === 'login_at_home_only') setOutside(true);
+                else setLoadError(errorMessage(err));
+            });
         api.get<{ pin_reset: boolean }>('/api/config').then(res => setCanReset(res.data.pin_reset)).catch(() => undefined);
     }, []);
+    useEffect(loadNames, [loadNames]);
 
     const forgot = async () => {
         if (!chosen) return;
@@ -76,6 +84,12 @@ export default function Login() {
     return (
         <div className="mx-auto max-w-md px-4 py-10">
             <h1 className="mb-6 text-center text-2xl font-semibold">🏠 {t('login.title')}</h1>
+            {loadError && (
+                <div className="space-y-3 text-center">
+                    <p role="alert" className={ERROR}>{loadError}</p>
+                    <button type="button" className={BUTTON_SECONDARY} onClick={() => { setLoadError(''); loadNames(); }}>{t('login.retry')}</button>
+                </div>
+            )}
             {!chosen ? (
                 <div className="grid grid-cols-2 gap-3">
                     {(names ?? []).map(n => (

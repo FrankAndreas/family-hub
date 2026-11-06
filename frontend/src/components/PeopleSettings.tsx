@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, type FormEvent } from 'react';
+import { useState, type FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import api, { errorMessage } from '../api';
 import { useAuth } from '../AuthContext';
@@ -10,26 +10,26 @@ interface Form {
     id: number | null; name: string; email: string; role: Role; color: string; active: boolean; pin: string;
     // Editing oneself: the address as it was, and the own PIN needed to change it
     oldEmail: string; currentPin: string;
+    // The role as saved (a new person: none)
+    oldRole: Role | null;
 }
 
-const empty: Form = { id: null, name: '', email: '', role: 'CHILD', color: '#64748b', active: true, pin: '', oldEmail: '', currentPin: '' };
+const empty: Form = { id: null, name: '', email: '', role: 'CHILD', color: '#64748b', active: true, pin: '', oldEmail: '', currentPin: '', oldRole: null };
 
-// Parents: the family's people, in one place for every app (name, e-mail for Cloudflare, role, colour, PIN)
-export default function PeopleSettings() {
+// Parents: the family's people, in one place for every app (name, e-mail for Cloudflare, role, colour, PIN). The list
+// comes from the settings page, which shares it with the apps' section
+export default function PeopleSettings({ people, loadError, reload }: { people: Person[]; loadError: string; reload: () => void }) {
     const { t } = useTranslation();
     const { person: me } = useAuth();
-    const [people, setPeople] = useState<Person[]>([]);
     const [form, setForm] = useState<Form | null>(null);
     const [error, setError] = useState('');
-
-    const load = useCallback(() => {
-        api.get<Person[]>('/api/people').then(res => setPeople(res.data)).catch(err => setError(errorMessage(err)));
-    }, []);
-    useEffect(load, [load]);
 
     const save = async (e: FormEvent) => {
         e.preventDefault();
         if (!form) return;
+        // Someone else made a parent is another parent from then on: only they change their details, PIN and role
+        const newParent = form.role === 'PARENT' && form.oldRole !== 'PARENT' && form.id !== me?.id;
+        if (newParent && !confirm(t('people.confirmParent', { name: form.name }))) return;
         const body = { name: form.name, email: form.email.trim() || null, role: form.role, color: form.color };
         try {
             if (form.id === null) {
@@ -42,14 +42,14 @@ export default function PeopleSettings() {
             }
             setForm(null);
             setError('');
-            load();
+            reload();
         } catch (err) {
             setError(errorMessage(err));
         }
     };
 
     const edit = (p: Person) =>
-        setForm({ id: p.id, name: p.name, email: p.email_pending ?? p.email ?? '', role: p.role, color: p.color ?? '#64748b', active: p.active, pin: '', oldEmail: p.email_pending ?? p.email ?? '', currentPin: '' });
+        setForm({ id: p.id, name: p.name, email: p.email_pending ?? p.email ?? '', role: p.role, color: p.color ?? '#64748b', active: p.active, pin: '', oldEmail: p.email_pending ?? p.email ?? '', currentPin: '', oldRole: p.role });
     const editingSelf = form !== null && form.id !== null && form.id === me?.id;
     const emailChanged = editingSelf && form.email.trim() !== form.oldEmail;
     // Other parents are read-only: each parent changes only themselves and the children
@@ -61,7 +61,7 @@ export default function PeopleSettings() {
                 {!form && <button type="button" className={BUTTON_SECONDARY} onClick={() => setForm(empty)}>{t('people.add')}</button>}
             </div>
             <p className="text-sm text-slate-400">{t('people.intro')}</p>
-            {error && <p className={ERROR}>{error}</p>}
+            {(error || loadError) && <p className={ERROR}>{error || loadError}</p>}
             {form && (
                 <form onSubmit={save} className="grid gap-2 sm:grid-cols-2">
                     <label className="text-sm text-slate-400">{t('people.name')}

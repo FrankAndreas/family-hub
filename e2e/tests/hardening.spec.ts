@@ -7,6 +7,8 @@ async function addParent(page: Page, name: string, pin: string) {
     await page.getByLabel('Name', { exact: true }).fill(name);
     await page.getByRole('combobox', { name: /^Role/ }).selectOption('PARENT');
     await page.getByLabel('PIN of the person', { exact: true }).fill(pin);
+    // A new parent is asked about: only they change their details afterwards
+    page.once('dialog', dialog => void dialog.accept());
     await page.getByRole('button', { name: 'Save person' }).click();
     await expect(page.getByRole('listitem').filter({ hasText: name })).toContainText('Parent');
 }
@@ -109,6 +111,13 @@ test('promote a child and set the PIN in one save', async ({ page }) => {
     await page.getByRole('button', { name: `Edit ${kid}` }).click();
     await page.getByRole('combobox', { name: /^Role/ }).selectOption('PARENT');
     await page.getByLabel('New PIN (empty: unchanged)', { exact: true }).fill('8642');
+    // Making someone a parent asks first; "Cancel" saves nothing and keeps the form
+    let asked = '';
+    page.once('dialog', dialog => { asked = dialog.message(); void dialog.dismiss(); });
+    await page.getByRole('button', { name: 'Save person' }).click();
+    await expect.poll(() => asked).toContain(`${kid} becomes a parent`);
+    await expect(page.getByRole('button', { name: 'Save person' })).toBeVisible();
+    page.once('dialog', dialog => void dialog.accept());
     await page.getByRole('button', { name: 'Save person' }).click();
     await expect(page.getByRole('listitem').filter({ hasText: kid })).toContainText('Parent');
     await logOut(page);
@@ -120,9 +129,8 @@ test("another parent's app: greyed out once they used it", async ({ page, browse
     const ida = uniqueName('Ida');
     const app = uniqueName('Kalender');
     await logIn(page, 'Admin', ADMIN_PIN);
+    // No reload: the app form knows a person as soon as they are added
     await addParent(page, ida, '5791');
-    // The app form knows the people from when the page opened
-    await page.reload();
     await page.getByRole('button', { name: '+ Add app' }).click();
     await page.getByLabel('App name', { exact: true }).fill(app);
     await page.getByLabel('Address at home', { exact: true }).fill('https://kalender.local.example.ch');

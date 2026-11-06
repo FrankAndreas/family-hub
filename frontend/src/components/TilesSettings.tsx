@@ -19,18 +19,17 @@ const empty: Form = {
 };
 
 // Parents: the apps on the start page; without an outside address an app is shown at home only. An app that uses the
-// family login has a key, and only the people ticked for it see and use it
-export default function TilesSettings() {
+// family login has a key, and only the people ticked for it see and use it. The people come from the settings page,
+// so someone just added in the people's section can be ticked here right away
+export default function TilesSettings({ people }: { people: Person[] }) {
     const { t, i18n } = useTranslation();
     const { person: me } = useAuth();
     const [tiles, setTiles] = useState<TileFull[]>([]);
-    const [people, setPeople] = useState<Person[]>([]);
     const [form, setForm] = useState<Form | null>(null);
     const [error, setError] = useState('');
 
     const load = useCallback(() => {
         api.get<TileFull[]>('/api/tiles/manage').then(res => setTiles(res.data)).catch(err => setError(errorMessage(err)));
-        api.get<Person[]>('/api/people').then(res => setPeople(res.data)).catch(err => setError(errorMessage(err)));
     }, []);
     useEffect(load, [load]);
 
