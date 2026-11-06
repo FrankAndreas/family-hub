@@ -1,6 +1,7 @@
+from datetime import datetime
 from typing import Literal
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_serializer, field_validator
 
 from .models import Role
 
@@ -119,6 +120,19 @@ class TilePatch(BaseModel):
     cf_audience: str | None = Field(default=None, pattern=CF_AUDIENCE)
 
 
+class TileUsage(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    person_id: int
+    first_used_at: datetime
+    last_used_at: datetime
+
+    @field_serializer("first_used_at", "last_used_at")
+    def as_utc(self, value: datetime) -> str:
+        # Stored as naive UTC
+        return value.replace(microsecond=0).isoformat() + "Z"
+
+
 class TileOut(BaseModel):
     id: int
     name: str
@@ -130,6 +144,8 @@ class TileOut(BaseModel):
     people: list[int]
     share_email: bool
     cf_audience: str | None
+    # Who used the app under its current key, and when
+    usage: list[TileUsage]
 
     @field_validator("people", mode="before")
     @classmethod

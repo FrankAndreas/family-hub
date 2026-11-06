@@ -114,3 +114,46 @@ test('promote a child and set the PIN in one save', async ({ page }) => {
     await logOut(page);
     await logIn(page, kid, '8642');
 });
+
+// A parent can't untick another parent who used an app, delete it or change its key; while they never used it, they can
+test("another parent's app: greyed out once they used it", async ({ page, browser }) => {
+    const ida = uniqueName('Ida');
+    const app = uniqueName('Kalender');
+    await logIn(page, 'Admin', ADMIN_PIN);
+    await addParent(page, ida, '5791');
+    // The app form knows the people from when the page opened
+    await page.reload();
+    await page.getByRole('button', { name: '+ Add app' }).click();
+    await page.getByLabel('App name', { exact: true }).fill(app);
+    await page.getByLabel('Address at home', { exact: true }).fill('https://kalender.local.example.ch');
+    const key = page.getByLabel('App key', { exact: true });
+    await key.fill(uniqueName('kalender').toLowerCase());
+    const idaBox = page.getByRole('checkbox', { name: ida, exact: true });
+    await idaBox.check();
+    await page.getByRole('button', { name: 'Save app' }).click();
+
+    // Never used: a wrong key can be corrected
+    await expect(page.getByRole('button', { name: `Delete ${app}` })).toBeEnabled();
+    await page.getByRole('button', { name: `Edit ${app}` }).click();
+    await expect(idaBox).toBeEnabled();
+    await expect(page.getByText('(never used)')).toBeVisible();
+    const fixed = uniqueName('planner').toLowerCase();
+    await key.fill(fixed);
+    await page.getByRole('button', { name: 'Save app' }).click();
+
+    // Ida opens the app: it asks the hub with her login
+    const idaContext = await browser.newContext();
+    const idaPage = await idaContext.newPage();
+    await logIn(idaPage, ida, '5791');
+    expect((await (await idaPage.request.get(`/api/session?app=${fixed}`)).json()).access).toBe(true);
+    await idaContext.close();
+
+    await page.reload();
+    await expect(page.getByRole('button', { name: `Delete ${app}` })).toBeDisabled();
+    await page.getByRole('button', { name: `Edit ${app}` }).click();
+    await expect(idaBox).toBeDisabled();
+    await expect(page.getByText(/\(last used /)).toBeVisible();
+    await expect(key).toHaveValue(fixed);
+    await expect(key).toBeDisabled();
+    await expect(page.getByText(`${ida} already uses this app, so you can't change its key.`)).toBeVisible();
+});

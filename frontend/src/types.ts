@@ -27,4 +27,6 @@ export interface TileFull {
     share_email: boolean;
     // The AUD tag of the app's Cloudflare Access application: its Cloudflare logins count only for it
     cf_audience: string | null;
+    // Who used the app under its current key, and when (UTC, ISO)
+    usage: { person_id: number; first_used_at: string; last_used_at: string }[];
 }

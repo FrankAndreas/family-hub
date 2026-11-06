@@ -2,6 +2,7 @@
 with an outside address are shown, and no home address ever leaves the house."""
 
 from fastapi import APIRouter, Depends, Request
+from sqlalchemy import update
 from sqlalchemy.orm import Session
 
 from . import auth, models, schemas
@@ -29,8 +30,11 @@ def _people(db: Session, ids: list[int]) -> list[models.Person]:
     return found
 
 
-def _other_parents(tile: models.Tile, actor: models.Person) -> set[int]:
-    return {p.id for p in tile.people if p.role == models.Role.PARENT and p.id != actor.id}
+def _protected(tile: models.Tile, actor: models.Person) -> set[int]:
+    """The other parents who used the app under its current key: only they themselves can untick themselves, and
+    while they are ticked the app can't be deleted nor its key changed. Someone who never used it loses nothing."""
+    parents = {p.id for p in tile.people if p.role == models.Role.PARENT and p.id != actor.id}
+    return parents & {a.person_id for a in tile.usage}
 
 
 def _check_key(db: Session, key: str | None, tile_id: int | None = None) -> None:
@@ -85,14 +89,16 @@ def change_tile(
     db: Session = Depends(get_db),
 ):
     tile = _get(db, tile_id)
-    # A parent can't take an app away from another parent (security review 2026-10-30): not by unticking them, and
-    # not by moving the app's key to another tile
-    others = _other_parents(tile, actor)
-    if others and body.people is not None and not others <= set(body.people):
-        raise api_error(403, "other_parent")
-    if others and "app_key" in body.model_fields_set and body.app_key != tile.app_key:
-        raise api_error(403, "other_parent")
-    if "app_key" in body.model_fields_set:
+    # A parent can't take an app away from another parent who uses it (security review 2026-10-30): not by unticking
+    # them, and not by moving the app's key to another tile. A key typed wrong or someone who never opened the app can
+    # be corrected: that takes nothing from anyone
+    protected = _protected(tile, actor)
+    if protected and body.people is not None and not protected <= set(body.people):
+        raise api_error(403, "tile_other_parent")
+    key_changes = "app_key" in body.model_fields_set and body.app_key != tile.app_key
+    if protected and key_changes:
+        raise api_error(403, "tile_key_in_use")
+    if key_changes:
         _check_key(db, body.app_key, tile.id)
     for field in body.model_fields_set:
         value = getattr(body, field)
@@ -104,6 +110,14 @@ def change_tile(
         if value is None and field not in ("remote_url", "app_key", "cf_audience"):
             continue
         setattr(tile, field, value)
+    if key_changes:
+        # Under the new key nobody has used the app yet
+        db.flush()
+        db.execute(
+            update(models.tile_access)
+            .where(models.tile_access.c.tile_id == tile.id)
+            .values(first_used_at=None, last_used_at=None)
+        )
     db.commit()
     return tile
 
@@ -111,8 +125,8 @@ def change_tile(
 @router.delete("/tiles/{tile_id}")
 def delete_tile(tile_id: int, actor: models.Person = Depends(auth.require_parent), db: Session = Depends(get_db)):
     tile = _get(db, tile_id)
-    if _other_parents(tile, actor):
-        raise api_error(403, "other_parent")
+    if _protected(tile, actor):
+        raise api_error(403, "tile_other_parent")
     db.delete(tile)
     db.commit()
     return {"deleted": tile_id}
