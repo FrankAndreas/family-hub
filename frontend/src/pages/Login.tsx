@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { useCallback, useEffect, useState, type FormEvent } from 'react';
+import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import api, { errorMessage } from '../api';
@@ -52,12 +52,14 @@ export default function Login() {
         }
     };
 
-    const submit = async (e: FormEvent) => {
-        e.preventDefault();
-        if (!chosen) return;
+    // One login at a time: the fourth digit sends it, and Enter or the button may follow right after
+    const busy = useRef(false);
+    const logIn = async (value: string) => {
+        if (!chosen || busy.current) return;
+        busy.current = true;
         setError('');
         try {
-            await api.post('/api/login', { name: chosen, pin });
+            await api.post('/api/login', { name: chosen, pin: value });
             await reload();
             // Back to the app that sent the person here, if it's one of the start page's
             const tiles = (await api.get<Tile[]>('/api/tiles')).data;
@@ -67,7 +69,16 @@ export default function Login() {
         } catch (err) {
             setPin('');
             setError(errorMessage(err));
+            // Straight back to typing, also after a click on the button
+            document.getElementById('pin')?.focus();
+        } finally {
+            busy.current = false;
         }
+    };
+
+    const submit = (e: FormEvent) => {
+        e.preventDefault();
+        void logIn(pin);
     };
 
     if (outside) {
@@ -90,6 +101,7 @@ export default function Login() {
                     <button type="button" className={BUTTON_SECONDARY} onClick={() => { setLoadError(''); loadNames(); }}>{t('login.retry')}</button>
                 </div>
             )}
+            {names === null && !loadError && <p role="status" className="text-center text-slate-400">{t('common.loading')}</p>}
             {!chosen ? (
                 <div className="grid grid-cols-2 gap-3">
                     {(names ?? []).map(n => (
@@ -104,7 +116,11 @@ export default function Login() {
                 <form onSubmit={submit} className={`${CARD} space-y-4`}>
                     <p className="text-lg">{chosen}</p>
                     <label htmlFor="pin" className="sr-only">{t('login.pin')}</label>
-                    <PinInput id="pin" value={pin} onChange={setPin} autoFocus />
+                    <PinInput id="pin" value={pin} autoFocus onChange={value => {
+                        setPin(value);
+                        // A PIN has 4 digits: the last one logs in, one tap less on the tablet
+                        if (value.length === 4) void logIn(value);
+                    }} />
                     {error && <p className={ERROR}>{error}</p>}
                     {resetSent && <p role="status" className="text-slate-300">{t('login.resetSent')}</p>}
                     <div className="flex gap-2">

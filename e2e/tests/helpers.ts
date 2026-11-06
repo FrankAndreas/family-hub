@@ -26,7 +26,7 @@ export const uniqueName = (prefix: string) => `${prefix}${Date.now().toString(36
 export async function logIn(page: Page, name: string, pin: string) {
     await page.goto('/');
     await page.getByRole('button', { name, exact: true }).click();
+    // The fourth digit logs in by itself
     await page.getByLabel('PIN', { exact: true }).fill(pin);
-    await page.getByRole('button', { name: 'Log in' }).click();
     await expect(page.getByRole('heading', { name: `Hello ${name}` })).toBeVisible();
 }

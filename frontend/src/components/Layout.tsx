@@ -1,10 +1,14 @@
 import { type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Link } from 'react-router-dom';
+import { Link, NavLink } from 'react-router-dom';
 import { useAuth } from '../AuthContext';
 import { BUTTON_SECONDARY } from '../ui';
 import LoginAgain from './LoginAgain';
 import { logoutAddress } from '../next';
+
+// The page one is on stands out (NavLink also sets aria-current="page")
+const navClass = ({ isActive }: { isActive: boolean }) =>
+    isActive ? 'font-semibold text-white underline decoration-cyan-400 decoration-2 underline-offset-8' : 'text-slate-300 hover:text-white';
 
 // The frame of every page once logged in: the family's name, Start, Settings, and logging out
 export default function Layout({ children }: { children: ReactNode }) {
@@ -15,8 +19,8 @@ export default function Layout({ children }: { children: ReactNode }) {
             <header className="mb-6 flex flex-wrap items-center gap-3">
                 <Link to="/" className="mr-auto text-xl font-semibold text-slate-100">🏠 {t('app.title')}</Link>
                 <nav className="flex flex-wrap items-center gap-3 text-sm">
-                    <Link to="/" className="text-slate-300 hover:text-white">{t('nav.start')}</Link>
-                    <Link to="/settings" className="text-slate-300 hover:text-white">{t('nav.settings')}</Link>
+                    <NavLink to="/" end className={navClass}>{t('nav.start')}</NavLink>
+                    <NavLink to="/settings" className={navClass}>{t('nav.settings')}</NavLink>
                     {person && (
                         <button type="button" className={BUTTON_SECONDARY} onClick={() => {
                             const outside = logoutAddress(person.at_home);

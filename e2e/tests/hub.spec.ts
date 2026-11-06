@@ -37,13 +37,17 @@ test('people, tiles and the start page', async ({ page }) => {
     await expect(page.getByRole('button', { name: '+ Add person' })).toHaveCount(0);
 });
 
-// A wrong PIN says so and stays on the login screen
+// A wrong PIN says so and stays on the login screen, ready for the next try; typing is all it takes
 test('wrong PIN', async ({ page }) => {
     await page.goto('/');
     await page.getByRole('button', { name: 'Admin', exact: true }).click();
-    await page.getByLabel('PIN', { exact: true }).fill('0000');
-    await page.getByRole('button', { name: 'Log in' }).click();
+    const pin = page.getByLabel('PIN', { exact: true });
+    await pin.pressSequentially('0000');
     await expect(page.getByText('Wrong name or PIN')).toBeVisible();
+    await expect(pin).toHaveValue('');
+    await expect(pin).toBeFocused();
+    await page.keyboard.type(ADMIN_PIN);
+    await expect(page.getByRole('heading', { name: 'Hello Admin' })).toBeVisible();
 });
 
 // An app sends people to the hub's login with ?next=; back they go only to an app on the start page
@@ -51,7 +55,6 @@ test('back to the app after logging in', async ({ page }) => {
     await page.goto('/?next=https://evil.example.com/');
     await page.getByRole('button', { name: 'Admin', exact: true }).click();
     await page.getByLabel('PIN', { exact: true }).fill(ADMIN_PIN);
-    await page.getByRole('button', { name: 'Log in' }).click();
     // Not an app of the family: stays on the start page
     await expect(page.getByRole('heading', { name: 'Hello Admin' })).toBeVisible();
 });

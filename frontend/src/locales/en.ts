@@ -3,7 +3,7 @@ import type de from './de';
 // English texts: the same keys as de.ts
 const en: typeof de = {
     app: { title: 'Family' },
-    common: { cancel: 'Cancel', edit: 'Edit', delete: 'Delete' },
+    common: { cancel: 'Cancel', edit: 'Edit', delete: 'Delete', loading: 'Loading …' },
     languages: { de: 'Deutsch', en: 'English' },
     nav: { start: 'Start', settings: 'Settings', logout: 'Log out' },
     login: {
@@ -60,6 +60,9 @@ const en: typeof de = {
         newPinOptional: 'New PIN (empty: unchanged)',
         active: 'Active',
         confirmParent: '{{name}} becomes a parent. From then on only {{name}} can change their own details, PIN and role, not you any more. Save?',
+        activeHint: 'Not active: logged out everywhere, gone from the login and the apps. Their data stays.',
+        emailHint: 'The address counts once the person opens the link the hub mails to it (at home, within 24 hours).',
+        ownDetails: 'changes their own details',
         save: 'Save person',
         editOf: 'Edit {{name}}',
         roles: { PARENT: 'Parent', CHILD: 'Child' },
@@ -84,6 +87,8 @@ const en: typeof de = {
         confirmDelete: 'Remove "{{name}}" from the start page?',
         appKey: 'App key',
         appKeyHint: 'only for apps that use the family login, e.g. budget',
+        appKeyFormat: 'Lowercase letters, digits and hyphens, 2–20 characters, starting with a letter',
+        cfAudienceFormat: '64 hexadecimal characters (0–9, a–f), from the Access application at Cloudflare',
         who: 'Who may use it',
         shareEmail: 'The app may see their confirmed e-mail addresses (e.g. for reminders)',
         cfAudience: 'Cloudflare Access: the AUD tag of this app\'s application',

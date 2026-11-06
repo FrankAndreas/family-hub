@@ -48,3 +48,43 @@ test('language change that fails', async ({ page }) => {
     await expect(page.getByRole('alert')).toHaveText('No connection to the server.');
     await expect(page.getByLabel('Language')).toHaveValue('en');
 });
+
+// The page one is on stands out in the navigation
+test('navigation marks the current page', async ({ page }) => {
+    await logIn(page, 'Admin', ADMIN_PIN);
+    await expect(page.getByRole('link', { name: 'Start' })).toHaveAttribute('aria-current', 'page');
+    await page.getByRole('link', { name: 'Settings' }).click();
+    await expect(page.getByRole('link', { name: 'Settings' })).toHaveAttribute('aria-current', 'page');
+    await expect(page.getByRole('link', { name: 'Start' })).not.toHaveAttribute('aria-current', 'page');
+});
+
+// "Edit" opens the form with the cursor in it; while it is open no other "Edit" can throw its input away
+test('one edit form at a time', async ({ page }) => {
+    const ola = uniqueName('Ola');
+    await logIn(page, 'Admin', ADMIN_PIN);
+    await page.getByRole('link', { name: 'Settings' }).click();
+    await page.getByRole('button', { name: '+ Add person' }).click();
+    await expect(page.getByLabel('Name', { exact: true })).toBeFocused();
+    await page.getByLabel('Name', { exact: true }).fill(ola);
+    await page.getByLabel('E-mail', { exact: true }).fill(`${ola.toLowerCase()}@example.org`);
+    await expect(page.getByText('The address counts once the person opens the link')).toBeVisible();
+    await page.getByLabel('PIN of the person', { exact: true }).fill('3141');
+    await page.getByRole('button', { name: 'Save person' }).click();
+
+    await page.getByRole('button', { name: `Edit ${ola}` }).click();
+    await expect(page.getByLabel('Name', { exact: true })).toBeFocused();
+    await expect(page.getByLabel('Name', { exact: true })).toBeInViewport();
+    await expect(page.getByLabel('Active')).toHaveAccessibleDescription(/logged out everywhere/);
+    await expect(page.getByRole('button', { name: 'Edit Admin' })).toBeDisabled();
+    await page.getByRole('button', { name: 'Cancel' }).click();
+    await expect(page.getByRole('button', { name: 'Edit Admin' })).toBeEnabled();
+});
+
+// The app key's format is described, so the browser's own message helps
+test('app key format', async ({ page }) => {
+    await logIn(page, 'Admin', ADMIN_PIN);
+    await page.getByRole('link', { name: 'Settings' }).click();
+    await page.getByRole('button', { name: '+ Add app' }).click();
+    await expect(page.getByLabel('App name', { exact: true })).toBeFocused();
+    await expect(page.getByLabel('App key', { exact: true })).toHaveAttribute('title', /Lowercase letters, digits and hyphens/);
+});

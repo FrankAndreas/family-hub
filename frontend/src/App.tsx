@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { AuthProvider, useAuth } from './AuthContext';
 import Layout from './components/Layout';
@@ -9,8 +10,9 @@ import Settings from './pages/Settings';
 import Start from './pages/Start';
 
 function Pages() {
+    const { t } = useTranslation();
     const { person, loading } = useAuth();
-    if (loading) return null;
+    if (loading) return <p role="status" className="px-4 py-10 text-center text-slate-400">{t('common.loading')}</p>;
     if (!person) return <Login />;
     return (
         <Layout>

@@ -4,6 +4,7 @@ import api, { errorMessage } from '../api';
 import { useAuth } from '../AuthContext';
 import type { Person, TileFull } from '../types';
 import { BUTTON, BUTTON_SECONDARY, CARD, ERROR, INPUT } from '../ui';
+import { useFormFocus } from './useFormFocus';
 
 interface Form {
     id: number | null; name: string; icon: string; local_url: string; remote_url: string; app_key: string; people: number[];
@@ -27,6 +28,7 @@ export default function TilesSettings({ people }: { people: Person[] }) {
     const [tiles, setTiles] = useState<TileFull[]>([]);
     const [form, setForm] = useState<Form | null>(null);
     const [error, setError] = useState('');
+    const formRef = useFormFocus(form ? String(form.id) : null);
 
     const load = useCallback(() => {
         api.get<TileFull[]>('/api/tiles/manage').then(res => setTiles(res.data)).catch(err => setError(errorMessage(err)));
@@ -87,7 +89,7 @@ export default function TilesSettings({ people }: { people: Person[] }) {
             <p className="text-sm text-slate-400">{t('tiles.intro')}</p>
             {error && <p className={ERROR}>{error}</p>}
             {form && (
-                <form onSubmit={save} className="grid gap-2 sm:grid-cols-2">
+                <form ref={formRef} onSubmit={save} className="grid gap-2 sm:grid-cols-2">
                     <label className="text-sm text-slate-400">{t('tiles.name')}
                         <input className={INPUT} value={form.name} required maxLength={50} onChange={e => setForm({ ...form, name: e.target.value })} />
                     </label>
@@ -105,6 +107,7 @@ export default function TilesSettings({ people }: { people: Person[] }) {
                     <div className="text-sm text-slate-400">
                         <label>{t('tiles.appKey')}
                             <input className={`${INPUT} disabled:opacity-50`} value={form.app_key} maxLength={20} pattern="[a-z][a-z0-9\-]{1,19}"
+                                title={t('tiles.appKeyFormat')}
                                 placeholder={t('tiles.appKeyHint')} disabled={keyLocked} aria-describedby={keyLocked ? 'key-locked' : undefined}
                                 onChange={e => setForm({ ...form, app_key: e.target.value })} />
                         </label>
@@ -143,7 +146,7 @@ export default function TilesSettings({ people }: { people: Person[] }) {
                                 {t('tiles.shareEmail')}
                             </label>
                             <label className="mt-2 block">{t('tiles.cfAudience')}
-                                <input className={INPUT} value={form.cf_audience} maxLength={64} pattern="[0-9a-fA-F]{64}"
+                                <input className={INPUT} value={form.cf_audience} maxLength={64} pattern="[0-9a-fA-F]{64}" title={t('tiles.cfAudienceFormat')}
                                     placeholder={t('tiles.cfAudienceHint')} onChange={e => setForm({ ...form, cf_audience: e.target.value })} />
                             </label>
                         </fieldset>
@@ -166,7 +169,9 @@ export default function TilesSettings({ people }: { people: Person[] }) {
                                 aria-label={t('tiles.up', { name: tile.name })} onClick={() => move(index, -1)}>↑</button>
                             <button type="button" disabled={index === tiles.length - 1} className="text-slate-400 hover:text-white disabled:opacity-30"
                                 aria-label={t('tiles.down', { name: tile.name })} onClick={() => move(index, 1)}>↓</button>
-                            <button type="button" className="text-blue-300 hover:underline" aria-label={t('tiles.editOf', { name: tile.name })}
+                            {/* One form at a time: another "Edit" would throw away what is typed in the open one */}
+                            <button type="button" className="text-blue-300 hover:underline disabled:opacity-30 disabled:no-underline"
+                                aria-label={t('tiles.editOf', { name: tile.name })} disabled={form !== null}
                                 onClick={() => setForm({
                                     id: tile.id, name: tile.name, icon: tile.icon, local_url: tile.local_url, remote_url: tile.remote_url ?? '',
                                     app_key: tile.app_key ?? '', people: tile.people, share_email: tile.share_email,
