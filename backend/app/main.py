@@ -1,7 +1,8 @@
 import logging
 from contextlib import asynccontextmanager
 
-from fastapi import Depends, FastAPI
+from fastapi import Depends, FastAPI, Response
+from sqlalchemy.exc import SQLAlchemyError
 
 from . import apps_api, auth, config, database, database_setup, keys, login_api, people_api, session_api, tiles_api
 from .seed import seed_admin
@@ -43,5 +44,14 @@ app.include_router(tiles_api.router, prefix="/api")
 
 
 @app.get("/health")
-def health():
+def health(response: Response):
+    """For Docker's health check and the update script: the backend answers and can read its database (operations
+    review 2026-11-07)."""
+    try:
+        with database.engine.connect() as connection:
+            connection.exec_driver_sql("SELECT 1 FROM people LIMIT 1")
+    except SQLAlchemyError:
+        logger.exception("Health check: the database can't be read")
+        response.status_code = 503
+        return {"status": "database unreadable"}
     return {"status": "ok"}

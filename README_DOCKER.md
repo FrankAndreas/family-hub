@@ -120,17 +120,44 @@ menus from time to time.
 An app stays home-only when the tunnel has no route for it (like family-budget-dashboard). Give such an app no
 outside address in the hub.
 
-### Where the data is
+### Where the data is, and backups
 
-`data/` holds the database `hub.db` and `signing-key.pem`. Back up the whole folder, and keep the backup private: the
-PIN hashes in it fall to a brute force (4 digits), and the key signs logins for every app. Without the key, every
-login ends and the apps must fetch the new public key.
+`data/` holds the database `hub.db` and `signing-key.pem`; `.env` holds the settings and secrets (the Resend key).
+Without the key, every login ends and the apps must fetch the new public key; without the database, the family's
+people are gone.
+
+- **Every night** `nas-update.sh` (below) copies the database to `db-backups/` when it changed since the last copy,
+  and `signing-key.pem` when it is new. It keeps the newest 5 copies and every copy younger than 7 days.
+- **On another disk**: `db-backups/` is on the same disk as the hub. Back up the whole folder
+  `/volume1/docker/family-hub` (with `data/`, `db-backups/`, `.env` and `compose.yaml`) with **Hyper Backup** to a
+  USB disk or another NAS, daily.
+- Keep every backup private: the PIN hashes in it fall to a brute force (4 digits), and the key signs logins for every
+  app.
+
+### Restoring everything (a new NAS, or a lost folder)
+
+1. Install as above (steps 1–2), then put back `.env`, `compose.yaml` and `data/` from the Hyper Backup, owned by the
+   hub's user (`sudo chown -R 1031:100 data`, `sudo chmod 700 data`).
+2. Only `db-backups/` there: `sudo sh -c 'gunzip -c db-backups/hub-<newest>.sqlite.gz > data/hub.db'` and
+   `sudo cp db-backups/signing-key.pem data/`, then the `chown` above.
+3. `sudo docker-compose up -d`. Logins made before the backup still count (same key); people added after it are
+   missing.
+
+### Logs
+
+`sudo docker logs hub-backend`. Docker keeps three files of 10 MB per container (`logging` in `compose.yaml`), so the
+logs never fill the disk. The update script's own log is `logs/update.log`.
 
 ## Automatic updates
 
-`scripts/nas-update.sh` works as in the other family apps: it pulls the images, backs up the database to
-`db-backups/` if there is a new one, keeps the old images as `:previous`, restarts and waits until the backend is
-healthy (`logs/update.log`).
+`scripts/nas-update.sh` works as in the other family apps: it backs up the database (above), pulls the images and, if
+there is a new one, keeps the old images as `:previous`, restarts and waits until the backend is healthy
+(`logs/update.log`).
+
+**A broken update is undone at once.** The hub is the login of every family app, so a version that doesn't get
+healthy within 5 minutes is rolled back by the script: the previous images and the database from just before the
+update come back. The run still fails, so the mail below tells you; until a fixed version is published, every night
+tries again and rolls back again.
 
 1. Copy `scripts/nas-update.sh` into `/volume1/docker/family-hub` and make it executable (or let
    `scripts/deploy-nas.sh` upload it):
@@ -139,7 +166,10 @@ healthy (`logs/update.log`).
    sudo /volume1/docker/family-hub/nas-update.sh     # should end with "Up to date" or "Update complete"
    ```
 2. **Control Panel → Task Scheduler → Create → Scheduled Task → User-defined script**: user **root**, daily a few
-   minutes apart from the other apps, command `bash /volume1/docker/family-hub/nas-update.sh`.
+   minutes apart from the other apps, command `bash /volume1/docker/family-hub/nas-update.sh`. Under **Task
+   Settings**, tick **Send run details by email** and **Send run details only when the script terminates abnormally**
+   (needs **Control Panel → Notification → Email** set up): then a failed or rolled-back update, a failed backup or a
+   backend that isn't healthy sends you a mail.
 
 To deploy right away from your computer:
 ```bash
@@ -147,9 +177,10 @@ cp .deploy.env.example .deploy.env   # once; then set NAS_HOST and NAS_DIR
 scripts/deploy-nas.sh
 ```
 
-### Rolling back an update
+### Rolling back an update by hand
 
-First **disable the scheduled task**, otherwise the next night installs the same version again. Then:
+For a problem found later (the script already rolls back an update that doesn't get healthy). First **disable the
+scheduled task**, otherwise the next night installs the same version again. Then:
 
 ```bash
 cd /volume1/docker/family-hub

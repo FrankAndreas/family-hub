@@ -4,6 +4,7 @@ import type de from './de';
 const en: typeof de = {
     app: { title: 'Family' },
     common: { cancel: 'Cancel', edit: 'Edit', delete: 'Delete', loading: 'Loading …' },
+    unreachable: "The family hub can't be reached right now (it may be restarting). Trying again …",
     languages: { de: 'Deutsch', en: 'English' },
     nav: { start: 'Start', settings: 'Settings', logout: 'Log out' },
     login: {

@@ -1,11 +1,13 @@
 #!/bin/bash
 # Nightly auto-update for a family-hub Docker deployment (e.g. on a Synology NAS).
 #
-# Pulls the app images (backend, frontend) and, only if a newer image was
-# published, backs up the SQLite database, recreates the app containers and waits
-# until the backend is healthy. Without a new image it only checks that the
-# backend is healthy. The compose/.env configuration is never
-# changed by this script.
+# Every run backs up the SQLite database when it changed since the last backup,
+# and the signing key when it is new. Then it pulls the app images (backend,
+# frontend) and, only if a newer image was published, recreates the app
+# containers and waits until the backend is healthy. If it doesn't get healthy,
+# the previous images and the database from just before are put back (rollback).
+# Without a new image it only checks that the backend is healthy. The
+# compose/.env configuration is never changed by this script.
 #
 # Usage:   nas-update.sh [--force] [APP_DIR]
 #   APP_DIR  folder containing the compose file (compose.yaml, docker-compose.yml, ...)
@@ -14,7 +16,7 @@
 #            (e.g. after editing the compose file)
 #
 # Exit codes: 0 = up to date or updated successfully, 1 = failure (including a
-#             backend that isn't healthy).
+#             backend that isn't healthy, and an update that was rolled back).
 # See README_DOCKER.md ("Automatic updates") for the Task Scheduler setup.
 
 set -uo pipefail
@@ -25,7 +27,7 @@ export PATH="$PATH:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin"
 APP_SERVICES="backend frontend"
 BACKUP_KEEP=5        # always keep at least the newest 5 backups
 BACKUP_MIN_DAYS=7    # and every backup younger than 7 days
-HEALTH_TIMEOUT=300
+HEALTH_TIMEOUT=${HEALTH_TIMEOUT:-300}
 
 FORCE=0
 APP_DIR=""
@@ -129,22 +131,9 @@ for service in $APP_SERVICES; do
     needs_update "$service" && changed="$changed $service"
 done
 
-if [ -z "$changed" ] && [ "$FORCE" -eq 0 ]; then
-    # Nothing to install, but report a broken app (e.g. a backend crash-looping
-    # after a change to .env) instead of calling it up to date
-    if ! wait_healthy; then
-        compose logs --tail 50 backend >>"$LOG_FILE" 2>&1
-        fail "up to date, but the backend is not healthy (status: ${status:-unknown}); last logs in $LOG_FILE"
-    fi
-    log "Up to date"
-    exit 0
-fi
-log "Updating:${changed:- (forced)}"
-
-# Back up the database first: a new version may change it when it starts.
-# Writes the backup to stdout, using SQLite's online-backup API (a consistent
-# copy even while the backend is writing), through the running backend or a
-# one-off backend container if it is stopped
+# Back up the database: every night when it changed since the last backup, and always before an update (a new
+# version may change it when it starts). Writes the backup to stdout, using SQLite's online-backup API (a consistent
+# copy even while the backend is writing), through the running backend or a one-off backend container if it is stopped
 backup_sqlite() {
     local runner=(exec -T backend)
     [ -z "$(running_container_of backend)" ] && runner=(run --rm --no-deps -T backend)
@@ -164,11 +153,30 @@ os.unlink(tmp.name)
 '
 }
 
+# Puts a backup (.gz) back into the database, through a one-off backend container (so the file keeps its owner);
+# the backend must be stopped
+restore_sqlite() {
+    gzip -dc "$1" | compose run --rm --no-deps -T backend python -c '
+import os, sqlite3, sys, tempfile
+path = os.environ["DATABASE_URL"].split("sqlite:///", 1)[1]
+tmp = tempfile.NamedTemporaryFile(suffix=".db", delete=False)
+tmp.write(sys.stdin.buffer.read())
+tmp.close()
+src = sqlite3.connect(tmp.name)
+dst = sqlite3.connect(path)
+src.backup(dst)
+dst.close()
+src.close()
+os.unlink(tmp.name)
+'
+}
+
 backend_cid=$(container_of backend)
 database_url=""
 [ -n "$backend_cid" ] && database_url=$(docker inspect -f '{{range .Config.Env}}{{println .}}{{end}}' "$backend_cid" \
     | sed -n 's/^DATABASE_URL=//p' | head -n1)
 stamp=$(date '+%Y%m%d-%H%M%S')
+previous_backup=$(ls -1t "$BACKUP_DIR"/hub-*.gz 2>/dev/null | head -n1)
 case "$database_url" in
     sqlite:///*)
         backup="$BACKUP_DIR/hub-$stamp.sqlite.gz"
@@ -178,7 +186,15 @@ esac
 backup_ok=$?
 if [ -z "$backup" ]; then
     log "No database to back up yet (no backend container yet)"
-elif [ "$backup_ok" -eq 0 ]; then
+elif [ "$backup_ok" -ne 0 ]; then
+    rm -f "$backup"
+    fail "database backup failed, not updating"
+elif [ -z "$changed" ] && [ "$FORCE" -eq 0 ] && [ -n "$previous_backup" ] \
+    && cmp -s <(gzip -dc "$backup") <(gzip -dc "$previous_backup"); then
+    # Nothing changed since the last backup, and no update follows
+    rm -f "$backup"
+    backup="$previous_backup"
+else
     log "Database backup: $backup"
     # Delete a backup only if it is beyond the newest $BACKUP_KEEP and older than $BACKUP_MIN_DAYS days
     ls -1t "$BACKUP_DIR"/hub-*.gz 2>/dev/null | tail -n +$((BACKUP_KEEP + 1)) | while read -r old; do
@@ -186,10 +202,54 @@ elif [ "$backup_ok" -eq 0 ]; then
             rm -f "$old" && log "Removed old backup $(basename "$old")"
         fi
     done
-else
-    rm -f "$backup"
-    fail "database backup failed, not updating"
 fi
+
+# The signing key never changes by itself; a copy next to the database backups, kept when it is new or different
+key="$APP_DIR/data/signing-key.pem"
+if [ -f "$key" ] && ! cmp -s "$key" "$BACKUP_DIR/signing-key.pem"; then
+    cp "$key" "$BACKUP_DIR/signing-key.pem" && log "Signing key backed up to $BACKUP_DIR/signing-key.pem"
+fi
+
+if [ -z "$changed" ] && [ "$FORCE" -eq 0 ]; then
+    # Nothing to install, but report a broken app (e.g. a backend crash-looping
+    # after a change to .env) instead of calling it up to date
+    if ! wait_healthy; then
+        compose logs --tail 50 backend >>"$LOG_FILE" 2>&1
+        fail "up to date, but the backend is not healthy (status: ${status:-unknown}); last logs in $LOG_FILE"
+    fi
+    log "Up to date"
+    exit 0
+fi
+log "Updating:${changed:- (forced)}"
+
+# A broken update is undone at once: the hub is the login of every family app, so the family would be locked out of
+# all of them until someone rolls back by hand. The previous images come back, and the database from just before the
+# update (a migration may have changed it). The run still fails, so the Task Scheduler's mail tells about it.
+rollback_tags=""
+roll_back() {
+    if [ -z "$rollback_tags" ]; then
+        fail "$1; no previous version to go back to"
+    fi
+    log "$1: rolling back"
+    for pair in $rollback_tags; do
+        docker tag "${pair%%=*}" "${pair#*=}" && log "Back to ${pair%%=*}"
+    done
+    case "$changed" in
+        *backend*)
+            if [ -n "$backup" ]; then
+                compose stop backend >>"$LOG_FILE" 2>&1
+                restore_sqlite "$backup" >>"$LOG_FILE" 2>&1 && log "Database restored from $backup" \
+                    || log "Restoring the database from $backup failed"
+            fi ;;
+    esac
+    compose up -d $APP_SERVICES >>"$LOG_FILE" 2>&1
+    compose restart frontend >>"$LOG_FILE" 2>&1
+    if wait_healthy; then
+        fail "$1; rolled back to the previous version, which is healthy (see $LOG_FILE)"
+    fi
+    compose logs --tail 50 backend >>"$LOG_FILE" 2>&1
+    fail "$1; the rollback didn't help either (status: ${status:-unknown}); last logs in $LOG_FILE"
+}
 
 # Keep the running images as :previous, so pruning can't remove them and a
 # rollback stays possible (see "Rolling back an update" in README_DOCKER.md)
@@ -198,18 +258,19 @@ for service in $changed; do
     [ -z "$cid" ] && continue
     image=$(docker inspect -f '{{.Config.Image}}' "$cid")
     docker tag "$(docker inspect -f '{{.Image}}' "$cid")" "${image%:*}:previous" \
-        && log "Kept current $service image as ${image%:*}:previous"
+        && log "Kept current $service image as ${image%:*}:previous" \
+        && rollback_tags="$rollback_tags ${image%:*}:previous=$image"
 done
 
-compose up -d $APP_SERVICES >>"$LOG_FILE" 2>&1 || fail "docker compose up failed"
+compose up -d $APP_SERVICES >>"$LOG_FILE" 2>&1 || roll_back "docker compose up failed"
 # nginx resolves the backend's address once at startup; a recreated backend may have a new one
 case "$changed" in
-    *backend*) compose restart frontend >>"$LOG_FILE" 2>&1 || fail "restarting frontend failed" ;;
+    *backend*) compose restart frontend >>"$LOG_FILE" 2>&1 || roll_back "restarting frontend failed" ;;
 esac
 
 if ! wait_healthy; then
     compose logs --tail 50 backend >>"$LOG_FILE" 2>&1
-    fail "backend not healthy after ${HEALTH_TIMEOUT}s (status: ${status:-unknown}); last logs in $LOG_FILE, backup in $BACKUP_DIR"
+    roll_back "backend not healthy after ${HEALTH_TIMEOUT}s (status: ${status:-unknown})"
 fi
 
 # Remove superseded (dangling) images to save disk space
