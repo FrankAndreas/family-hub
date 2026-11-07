@@ -15,6 +15,8 @@ os.environ["COOKIE_INSECURE"] = "1"
 for _name in ("COOKIE_DOMAIN", "CF_TEAM_DOMAIN", "CF_AUDIENCE"):
     os.environ.pop(_name, None)
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "backend"))
+# The apps' client package (client/), tested here against the hub itself
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "client"))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 import functools  # noqa: E402

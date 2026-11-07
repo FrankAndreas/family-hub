@@ -25,8 +25,7 @@ def app_people(login: session_api.AppLogin = Depends(session_api.app_caller), db
         raise api_error(404, "app_not_found")
     if person not in tile.people:
         raise api_error(403, "no_access")
-    # Without `share_email` the address is left out, not sent as null
-    hidden = None if tile.share_email else {"email"}
+    hidden = session_api.hidden_fields(tile)
     return [
         schemas.AppPerson.model_validate(p).model_dump(exclude=hidden)
         for p in sorted(tile.people, key=lambda p: p.name_key)

@@ -1,12 +1,10 @@
 import axios from 'axios';
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import api, { errorMessage } from '../api';
 import { useAuth } from '../AuthContext';
 import PinInput from '../components/PinInput';
-import { safeNext } from '../next';
-import type { Tile } from '../types';
 import { BUTTON, BUTTON_SECONDARY, CARD, ERROR, TOUCH } from '../ui';
 
 interface Name { name: string; color: string | null }
@@ -16,7 +14,7 @@ export default function Login() {
     const { t } = useTranslation();
     const { reload } = useAuth();
     const navigate = useNavigate();
-    const [params] = useSearchParams();
+    const location = useLocation();
     const [names, setNames] = useState<Name[] | null>(null);
     // The PIN login is refused through Cloudflare: the person's e-mail isn't in the family list
     const [outside, setOutside] = useState(false);
@@ -60,12 +58,10 @@ export default function Login() {
         setError('');
         try {
             await api.post('/api/login', { name: chosen, pin: value });
+            // Logged in, the start page takes over (also after logging out on another page): back to the app that sent
+            // the person here (?next=), if any
+            navigate({ pathname: '/', search: location.search }, { replace: true });
             await reload();
-            // Back to the app that sent the person here, if it's one of the start page's
-            const tiles = (await api.get<Tile[]>('/api/tiles')).data;
-            const next = safeNext(params.get('next'), tiles.map(tile => tile.url));
-            if (next) window.location.href = next;
-            else navigate('/');
         } catch (err) {
             setPin('');
             setError(errorMessage(err));

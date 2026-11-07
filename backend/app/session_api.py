@@ -4,7 +4,7 @@ An app reads the login (the `hub_session` cookie at home), may check its signatu
 /api/session (briefly cached) to honour "log out everywhere", a new PIN and deactivated people."""
 
 from dataclasses import dataclass
-from datetime import timedelta
+from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
@@ -15,6 +15,9 @@ from .database import get_db
 
 router = APIRouter(tags=["session"])
 USE_RESOLUTION = timedelta(hours=1)
+# In its last week a hub login tells the app to send the browser through the hub once, which renews it (auth.renew): a
+# login in use doesn't run out, also for someone who only ever opens an app (app integration review 2026-11-07)
+RENEW_HINT = timedelta(days=7)
 _bearer = HTTPBearer(auto_error=False)
 
 
@@ -30,6 +33,8 @@ class AppLogin:
 
     person: models.Person | None
     tile: models.Tile | None
+    # A hub login at home in its last RENEW_HINT
+    renew: bool = False
 
 
 def _login(
@@ -49,9 +54,16 @@ def _login(
         person = cloudflare.person_for(request, db, audience)
     elif credentials is not None:
         person = auth.person_for_token(db, credentials.credentials)
+        return AppLogin(person, tile, person is not None and _ends_soon(credentials.credentials))
     else:
         person = auth.current_person_or_none(request, db)
     return AppLogin(person, tile)
+
+
+def _ends_soon(token: str) -> bool:
+    claims = auth.token_claims(token, "session")
+    exp = claims.get("exp") if claims else None
+    return isinstance(exp, int) and datetime.fromtimestamp(exp, timezone.utc) - datetime.now(timezone.utc) < RENEW_HINT
 
 
 def note_use(db: Session, login: AppLogin) -> None:
@@ -89,6 +101,12 @@ def app_caller(
     return _login(request, credentials, db, key)
 
 
+def hidden_fields(tile: models.Tile | None) -> set[str] | None:
+    """What an app doesn't see of a person: the e-mail address, unless its tile allows it (`share_email`). Without the
+    address, not as null: also the person's own, or every app would learn each address as its owner logs in."""
+    return None if tile is not None and tile.share_email else {"email"}
+
+
 @router.get("/api/session", response_model=schemas.SessionOut, response_model_exclude_unset=True)
 def session(app: str | None = None, login: AppLogin = Depends(caller), db: Session = Depends(get_db)):
     """Whether a login still counts; with ?app=<key> also whether the person may use that app. `valid` stays about the
@@ -97,7 +115,9 @@ def session(app: str | None = None, login: AppLogin = Depends(caller), db: Sessi
     db.commit()
     if login.person is None:
         return schemas.SessionOut(valid=False, person=None)
-    found = schemas.SessionOut(valid=True, person=schemas.AppPerson.model_validate(login.person))
+    # Validated again from what the app may see, so a left-out field stays out of the answer (exclude_unset)
+    shown = schemas.AppPerson.model_validate(login.person).model_dump(exclude=hidden_fields(login.tile))
+    found = schemas.SessionOut(valid=True, person=schemas.AppPerson.model_validate(shown), renew=login.renew)
     if app is not None:
         found.access = login.tile is not None and login.person in login.tile.people
     return found

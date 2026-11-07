@@ -79,11 +79,13 @@ class AppPerson(BaseModel):
 
 
 class SessionOut(BaseModel):
-    """Whether a login still counts. `access` (with ?app=<key>) is left out without a key."""
+    """Whether a login still counts. `access` (with ?app=<key>) is left out without a key; `renew` is there with a
+    valid login: true in a hub login's last week (send the browser through the hub once, which renews it)."""
 
     valid: bool
     person: AppPerson | None
     access: bool | None = None
+    renew: bool | None = None
 
 
 class TileLink(BaseModel):

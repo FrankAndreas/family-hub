@@ -16,14 +16,8 @@ def test_session_for_apps(client, db):
     found = client.get("/api/session", headers=bearer(token)).json()
     assert found == {
         "valid": True,
-        "person": {
-            "id": lena.id,
-            "name": "Lena",
-            "email": "lena@example.ch",
-            "role": "CHILD",
-            "color": "#f59e0b",
-            "language": "de",
-        },
+        "person": {"id": lena.id, "name": "Lena", "role": "CHILD", "color": "#f59e0b", "language": "de"},
+        "renew": False,
     }
     # The cookie at home counts as well
     login(client, "Lena", "5678")
@@ -80,3 +74,40 @@ def test_apps_pass_the_cloudflare_token_to_the_session(client, db, access):
     found = client.get("/api/session", headers=outside(token(aud="aud-of-the-apps"))).json()
     assert found["valid"] is True and found["person"]["name"] == "Mama"
     assert client.get("/api/session", headers=outside(token("x@example.ch"))).json()["valid"] is False
+
+
+# App integration review 2026-11-07: the person's address only for an app whose tile allows it, as in the app's people.
+# Else every app would learn each address as its owner logs in
+def test_the_address_only_for_an_app_allowed_to_see_it(client, db):
+    lena = make_person(db, "Lena", email="lena@example.ch")
+    tile = budget_tile(db, lena)
+    headers = bearer(auth.issue_tokens(lena)[0])
+
+    def person(**params):
+        return client.get("/api/session", params=params, headers=headers).json()["person"]
+
+    assert "email" not in person(app="budget") and "email" not in person()
+    tile.share_email = True
+    db.commit()
+    assert person(app="budget")["email"] == "lena@example.ch"
+    assert "email" not in person() and "email" not in person(app="nope")
+
+
+# App integration review 2026-11-07: someone who only opens apps never opens the hub, which renews a login (auth.renew).
+# In its last week the session says so, and the app sends the browser through the hub once
+def test_a_login_in_its_last_week_asks_to_be_renewed(client, db, monkeypatch):
+    lena = make_person(db, "Lena")
+    fresh = auth.issue_tokens(lena)[0]
+    monkeypatch.setattr(auth, "TOKEN_LIFETIME", timedelta(days=7) - timedelta(minutes=1))
+    old = auth.issue_tokens(lena)[0]
+    assert client.get("/api/session", headers=bearer(fresh)).json()["renew"] is False
+    assert client.get("/api/session", headers=bearer(old)).json()["renew"] is True
+    # No longer valid: nothing to renew
+    db.get(models.Person, lena.id).token_version += 1
+    db.commit()
+    assert "renew" not in client.get("/api/session", headers=bearer(old)).json()
+
+
+def test_cloudflare_logins_are_not_renewed_by_the_hub(client, db, access):
+    make_person(db, "Mama", role="PARENT", email="mama@example.ch")
+    assert client.get("/api/session", headers=outside(token())).json()["renew"] is False

@@ -31,7 +31,9 @@ Running it on the NAS: [README_DOCKER.md](README_DOCKER.md).
 
 ## For apps: using the family login
 
-An app that switches to the hub drops its own PINs and asks the hub who is logged in, with `GET <hub>/api/session`:
+An app that switches to the hub drops its own PINs and asks the hub who is logged in, with `GET <hub>/api/session`.
+A Python app does this with the client package in [client/](client/README.md) (asking, the cache, the rules for logins
+from outside, and a fake hub for its tests that family-hub's tests keep in step with the hub):
 
 - **A request from outside** carries `Cf-Connecting-Ip` (Cloudflare sets it on everything through the tunnel). The app
   passes on that header and `Cf-Access-Jwt-Assertion`, **and never a `hub_session` cookie**: one arriving from outside
@@ -42,8 +44,9 @@ An app that switches to the hub drops its own PINs and asks the hub who is logge
   app passes it on as `Authorization: Bearer <hub_session>`.
 - Neither header nor cookie belongs in an app's logs: each is a login to the hub, a parent's with full rights.
 
-The answer is `{"valid": true, "person": {"id", "name", "email", "role", "color", "language"}}` or
-`{"valid": false, "person": null}`. Cache it for a minute or so. The answers' exact form is in
+The answer is `{"valid": true, "person": {"id", "name", "role", "color", "language"}, "renew": false}` or
+`{"valid": false, "person": null}`, with `"email"` in `person` only for an app allowed to see addresses (below). Cache
+it for a minute or so. The answers' exact form is in
 `backend/app/schemas.py` (`SessionOut`, `AppPerson`), and in the backend's OpenAPI document (`/openapi.json` on the
 backend itself; nginx doesn't pass it on).
 
@@ -54,14 +57,18 @@ access" (say so; sending them to the hub would bring them straight back, again a
 
 **The app's people.** `GET <hub>/api/apps/<key>/people`, asked with the same login as `/api/session`, lists the active
 people with access: `[{"id", "name", "role", "color", "language"}]`. An app whose tile allows it ("may see e-mail
-addresses", e.g. the job tracking app) also gets `"email"`: the person's confirmed address or `null`; other apps get none. 403 when the person asking has no
+addresses", e.g. the job tracking app) also gets `"email"`: the person's confirmed address or `null`, here and in
+`/api/session?app=<key>`; other apps get none, not even the logged-in person's own. 403 when the person asking has no
 access, 404 for an unknown key. The app keeps its own copy keyed by `id`, refreshes it now and then, and hides people
 who left the list instead of deleting their data. Logging out everywhere, a new PIN and deactivating a
 person all end a login. The app keeps its own data per person under the hub's `person.id`.
 
 The hub's tokens are EdDSA JWTs (`iss` `family-hub`, `sub` the person's id). The hub renews a login in use by
 setting the cookie again with a later `exp` (same `jti`), so an app reads the cookie on every request rather than
-keeping a copy. An app may also check their signature
+keeping a copy. A login in use doesn't run out, also for someone who only ever opens an app: in a hub login's last week
+`/api/session` answers `"renew": true`, and the app sends the browser once to `https://home.local.<domain>/?next=<the
+page's address>` (at most once a day, in case the renewal doesn't take). A logged-in person is sent straight back, with
+the login renewed. An app may also check their signature
 itself with the public key at `<hub>/.well-known/jwks.json`; asking `/api/session` is still what honours a logout.
 
 Apps only read from the hub. Every change (POST, PUT, PATCH, DELETE) needs the header `X-Requested-With: hub`, which
@@ -85,7 +92,7 @@ Managing the hub (people, PINs, apps) needs a second cookie, `hub_manage`, that 
 `hub_session` an app passes on or leaks logs into the apps, but manages nothing.
 
 Not logged in: send the person to `https://home.local.<domain>/?next=<the app's address>`. After the login the hub
-sends them back, if the address belongs to an app on its start page.
+sends them back, if the address belongs to an app on its start page; someone still logged in goes back at once.
 
 ## Development
 
