@@ -163,3 +163,18 @@ def test_saving_again_with_the_waiting_address_changes_nothing(client, db, mail)
     mailer.flush()
     assert again.status_code == 200 and again.json()["email_pending"] == "admin@example.org"
     assert len(mail.mails) == sent
+
+
+# Second check (tests review 2026-11-07): a new address ends the old links, but even an open one only confirms the
+# address that is still waiting
+def test_a_link_confirms_only_the_waiting_address(client, db, mail):  # noqa: F811
+    login(client)
+    added = add_person(client, "Lena", email="lena@example.org")
+    mailer.flush()
+    lena = db.get(models.Person, added["id"])
+    lena.email_pending = "other@example.org"
+    db.commit()
+    refused = client.post("/api/email-confirm", json={"token": confirm_link_token(mail)})
+    assert refused.status_code == 400 and refused.json()["detail"] == "email_link_invalid"
+    db.refresh(lena)
+    assert lena.email is None

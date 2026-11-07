@@ -190,3 +190,14 @@ def test_links_end_when_deactivated(client, db, mail):
     assert client.patch(f"/api/people/{lena.id}", json={"active": False}).status_code == 200
     assert client.patch(f"/api/people/{lena.id}", json={"active": True}).status_code == 200
     assert confirm(client, token).status_code == 400
+
+
+# Second check (tests review 2026-11-07): deactivating ends the links, but even an open one doesn't work for someone
+# who is no longer active
+def test_no_new_pin_for_someone_inactive(client, db, mail):
+    lena = make_person(db, "Lena", email="lena@example.org")
+    ask(client, "Lena")
+    lena.active = False
+    db.commit()
+    refused = confirm(client, mail.token())
+    assert refused.status_code == 400 and refused.json()["detail"] == "reset_link_invalid"
