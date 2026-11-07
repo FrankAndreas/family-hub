@@ -9,7 +9,7 @@ from fastapi import APIRouter, Depends, Request
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.orm import Session
 
-from . import auth, cloudflare, keys, models, timeutil
+from . import auth, cloudflare, keys, models, schemas, timeutil
 from .database import get_db
 
 router = APIRouter(tags=["session"])
@@ -21,17 +21,6 @@ _bearer = HTTPBearer(auto_error=False)
 @router.get("/.well-known/jwks.json")
 def jwks():
     return keys.jwks()
-
-
-def session_person(person: models.Person) -> dict:
-    return {
-        "id": person.id,
-        "name": person.name,
-        "email": person.email,
-        "role": person.role.value,
-        "color": person.color,
-        "language": person.language_or_default,
-    }
 
 
 def _login(
@@ -96,7 +85,7 @@ def has_access(db: Session, person: models.Person, app_key: str) -> bool:
     return tile is not None and person in tile.people
 
 
-@router.get("/api/session")
+@router.get("/api/session", response_model=schemas.SessionOut, response_model_exclude_unset=True)
 def session(
     app: str | None = None,
     person: models.Person | None = Depends(caller),
@@ -105,8 +94,8 @@ def session(
     """Whether a login still counts; with ?app=<key> also whether the person may use that app. `valid` stays about the
     login, so an app can tell "not logged in" (send to the hub) from "no access" (say so) without a loop."""
     if person is None:
-        return {"valid": False, "person": None}
-    found: dict = {"valid": True, "person": session_person(person)}
+        return schemas.SessionOut(valid=False, person=None)
+    found = schemas.SessionOut(valid=True, person=schemas.AppPerson.model_validate(person))
     if app is not None:
-        found["access"] = has_access(db, person, app)
+        found.access = has_access(db, person, app)
     return found

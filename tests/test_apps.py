@@ -122,3 +122,15 @@ def test_parents_set_a_tiles_cloudflare_application(client):
     # Cloudflare's tags are 64 hex characters; anything else is a typo
     assert client.patch(f"/api/tiles/{tile['id']}", json={"cf_audience": "essen"}).status_code == 422
     assert client.patch(f"/api/tiles/{tile['id']}", json={"cf_audience": None}).json()["cf_audience"] is None
+
+
+# The apps' contract is in the OpenAPI document (#25), so it can't drift from the code unnoticed
+def test_the_apps_contract_is_documented(client):
+    paths = client.get("/openapi.json").json()["paths"]
+
+    def answer(path):
+        return paths[path]["get"]["responses"]["200"]["content"]["application/json"]["schema"]
+
+    assert answer("/api/session")["$ref"].endswith("/SessionOut")
+    assert answer("/api/apps/{key}/people")["items"]["$ref"].endswith("/AppPerson")
+    assert answer("/api/tiles")["items"]["$ref"].endswith("/TileLink")

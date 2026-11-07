@@ -179,3 +179,20 @@ def test_new_key_or_untick_forgets_the_use(client):
     client.get("/api/session?app=money")
     client.patch(f"/api/tiles/{tile['id']}", json={"people": [mia["id"]]})
     assert client.patch(f"/api/tiles/{tile['id']}", json={"people": [admin_id, mia["id"]]}).json()["usage"] == []
+
+
+# The settings page shows the rules without knowing them (#25): the backend says what the parent asking can't change
+def test_the_answer_says_what_is_locked(client):
+    login(client)
+    mia = add_person(client, "Mia", role="PARENT", pin="2468")
+    kid = add_person(client, "Kid", pin="1357")
+    tile, admin_id = _shared_tile(client, mia["id"])
+    assert client.get("/api/tiles/manage").json()[0]["locked_people"] == []
+    mia_client = _mia_uses(client, mia)
+    assert client.get("/api/tiles/manage").json()[0]["locked_people"] == [mia["id"]]
+    renamed = client.patch(f"/api/tiles/{tile['id']}", json={"name": "Geld"}).json()
+    assert renamed["locked_people"] == [mia["id"]]
+    # Mia herself may untick herself: nothing is locked for her
+    assert mia_client.get("/api/tiles/manage").json()[0]["locked_people"] == []
+    can_edit = {p["id"]: p["can_edit"] for p in client.get("/api/people").json()}
+    assert (can_edit[admin_id], can_edit[kid["id"]], can_edit[mia["id"]]) == (True, True, False)

@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import api, { errorMessage } from '../api';
-import { useAuth } from '../AuthContext';
 import type { Person, TileFull } from '../types';
 import { BUTTON, BUTTON_SECONDARY, CARD, ERROR, INPUT, TOUCH } from '../ui';
 import { useFormFocus } from './useFormFocus';
@@ -24,7 +23,6 @@ const empty: Form = {
 // so someone just added in the people's section can be ticked here right away
 export default function TilesSettings({ people }: { people: Person[] }) {
     const { t, i18n } = useTranslation();
-    const { person: me } = useAuth();
     const [tiles, setTiles] = useState<TileFull[]>([]);
     const [form, setForm] = useState<Form | null>(null);
     const [error, setError] = useState('');
@@ -35,11 +33,6 @@ export default function TilesSettings({ people }: { people: Person[] }) {
     }, []);
     useEffect(load, [load]);
 
-    // As the backend: a parent can't take an app away from another parent who uses it (tiles_api.change_tile)
-    const protectedParents = (tile: TileFull) => {
-        const used = new Set(tile.usage.map(u => u.person_id));
-        return people.filter(p => p.role === 'PARENT' && p.id !== me?.id && tile.people.includes(p.id) && used.has(p.id)).map(p => p.id);
-    };
     const names = (ids: number[]) => people.filter(p => ids.includes(p.id)).map(p => p.name).join(', ');
     const keyLocked = form !== null && form.protected.length > 0;
     const date = (iso: string) => new Date(iso).toLocaleDateString(i18n.language, { dateStyle: 'medium' });
@@ -175,14 +168,14 @@ export default function TilesSettings({ people }: { people: Person[] }) {
                                 onClick={() => setForm({
                                     id: tile.id, name: tile.name, icon: tile.icon, local_url: tile.local_url, remote_url: tile.remote_url ?? '',
                                     app_key: tile.app_key ?? '', people: tile.people, share_email: tile.share_email,
-                                    cf_audience: tile.cf_audience ?? '', protected: protectedParents(tile),
+                                    cf_audience: tile.cf_audience ?? '', protected: tile.locked_people,
                                     last_used: Object.fromEntries(tile.usage.map(u => [u.person_id, u.last_used_at])),
                                 })}>
                                 {t('common.edit')}
                             </button>
                             <button type="button" className={`${TOUCH} text-red-300 hover:underline disabled:opacity-30 disabled:no-underline`}
-                                aria-label={t('tiles.deleteOf', { name: tile.name })} disabled={protectedParents(tile).length > 0}
-                                title={protectedParents(tile).length > 0 ? t('tiles.deleteLocked', { names: names(protectedParents(tile)) }) : undefined}
+                                aria-label={t('tiles.deleteOf', { name: tile.name })} disabled={tile.locked_people.length > 0}
+                                title={tile.locked_people.length > 0 ? t('tiles.deleteLocked', { names: names(tile.locked_people) }) : undefined}
                                 onClick={() => remove(tile)}>{t('common.delete')}</button>
                         </span>
                     </li>

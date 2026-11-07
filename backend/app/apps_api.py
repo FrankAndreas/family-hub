@@ -7,14 +7,14 @@ apps only need to know and show their people."""
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
-from . import models, session_api
+from . import models, schemas, session_api
 from .database import get_db
 from .errors import api_error
 
 router = APIRouter(tags=["apps"])
 
 
-@router.get("/api/apps/{key}/people")
+@router.get("/api/apps/{key}/people", response_model=list[schemas.AppPerson], response_model_exclude_unset=True)
 def app_people(key: str, person: models.Person | None = Depends(session_api.app_caller), db: Session = Depends(get_db)):
     if person is None:
         raise api_error(401, "not_logged_in")
@@ -23,15 +23,10 @@ def app_people(key: str, person: models.Person | None = Depends(session_api.app_
         raise api_error(404, "app_not_found")
     if person not in tile.people:
         raise api_error(403, "no_access")
+    # Without `share_email` the address is left out, not sent as null
+    hidden = None if tile.share_email else {"email"}
     return [
-        {
-            "id": p.id,
-            "name": p.name,
-            "role": p.role.value,
-            "color": p.color,
-            "language": p.language_or_default,
-            **({"email": p.email} if tile.share_email else {}),
-        }
+        schemas.AppPerson.model_validate(p).model_dump(exclude=hidden)
         for p in sorted(tile.people, key=lambda p: p.name_key)
         if p.active
     ]
