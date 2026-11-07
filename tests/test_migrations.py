@@ -1,5 +1,6 @@
 """The database is brought up to date by Alembic migrations that match the models."""
 
+import pytest
 from alembic import command
 from sqlalchemy import create_engine, inspect
 
@@ -51,3 +52,25 @@ def test_migration_logs_everyone_out(tmp_path):
     database_setup.setup(engine)
     with engine.connect() as conn:
         assert conn.exec_driver_sql("SELECT token_version FROM people").scalar() == 1
+
+
+# Operations review 2026-11-07: a migration that fails halfway leaves nothing behind, so the next start (or the old
+# version, rolled back) finds the database as it was
+def test_a_failing_migration_leaves_nothing_behind(tmp_path):
+    engine = create_engine(f"sqlite:///{tmp_path}/m.db")
+    database_setup.run(engine, command.upgrade, "0007")
+
+    def half_done(config):
+        command.upgrade(config, "head")
+        config.attributes["connection"].exec_driver_sql("CREATE TABLE half_done (id INTEGER)")
+        raise RuntimeError("a migration step fails")
+
+    with pytest.raises(RuntimeError):
+        database_setup.run(engine, half_done)
+    inspector = inspect(engine)
+    assert "half_done" not in inspector.get_table_names()
+    with engine.connect() as conn:
+        assert conn.exec_driver_sql("SELECT version_num FROM alembic_version").scalar() == "0007"
+    database_setup.setup(engine)
+    with engine.connect() as conn:
+        assert conn.exec_driver_sql("SELECT version_num FROM alembic_version").scalar() == database_setup.HEAD

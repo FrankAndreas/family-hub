@@ -2,6 +2,7 @@
 const de = {
     app: { title: 'Familie' },
     common: { cancel: 'Abbrechen', edit: 'Bearbeiten', delete: 'Löschen', loading: 'Laden …' },
+    unreachable: 'Der Familien-Hub ist gerade nicht erreichbar (er startet vielleicht neu). Es wird weiter versucht …',
     languages: { de: 'Deutsch', en: 'English' },
     nav: { start: 'Start', settings: 'Einstellungen', logout: 'Abmelden' },
     login: {

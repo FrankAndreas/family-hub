@@ -184,3 +184,20 @@ test('log in again when the manage cookie is missing', async ({ page, context })
     await expect(page.getByRole('button', { name: 'Edit Admin' })).toBeVisible();
     await expect(page.getByRole('alert')).toHaveCount(0);
 });
+
+// While the hub restarts the page says so and keeps asking; the login still counts afterwards, so nobody types their PIN
+// again (operations review 2026-11-07)
+test('a restarting hub is not a logout', async ({ page }) => {
+    await logIn(page, 'Admin', ADMIN_PIN);
+    let refused = 0;
+    await page.route('**/api/me', async route => {
+        if (refused < 2) {
+            refused += 1;
+            await route.fulfill({ status: 502, body: 'Bad Gateway' });
+        } else await route.fallback();
+    });
+    await page.reload();
+    await expect(page.getByRole('status')).toHaveText("The family hub can't be reached right now (it may be restarting). Trying again …");
+    await expect(page.getByRole('heading', { name: 'Who are you?' })).toHaveCount(0);
+    await expect(page.getByRole('heading', { name: 'Hello Admin' })).toBeVisible({ timeout: 15_000 });
+});

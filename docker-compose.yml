@@ -43,6 +43,12 @@ services:
       timeout: 10s
       retries: 3
       start_period: 10s
+    logging: &logging
+      # Every app's login check and the health check write a line: a few MB a day, so keep 3 × 10 MB
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   frontend:
     image: ghcr.io/frankandreas/family-hub/frontend:latest
@@ -53,3 +59,4 @@ services:
     depends_on:
       - backend
     restart: unless-stopped
+    logging: *logging
