@@ -79,6 +79,25 @@ test('logout with next', async ({ page, baseURL }) => {
     await expect(page).toHaveURL(`${baseURL}/settings`);
 });
 
+// App integration review 2026-11-07: an app sends a person who is still logged in through the hub (to renew a login in
+// its last week): back they go at once, without the start page; an address that isn't an app's is dropped
+test('logged in already: straight back to the app', async ({ page, baseURL }) => {
+    const app = uniqueName('Renew');
+    await logIn(page, 'Admin', ADMIN_PIN);
+    await page.getByRole('link', { name: 'Settings' }).click();
+    await page.getByRole('button', { name: '+ Add app' }).click();
+    await page.getByLabel('App name', { exact: true }).fill(app);
+    await page.getByLabel('Address at home', { exact: true }).fill(`${baseURL}/`);
+    await page.getByRole('button', { name: 'Save app' }).click();
+    await expect(page.getByRole('listitem').filter({ hasText: app })).toBeVisible();
+
+    await page.goto(`/?next=${encodeURIComponent(`${baseURL}/settings`)}`);
+    await expect(page).toHaveURL(`${baseURL}/settings`);
+    await page.goto('/?next=https://evil.example.com/');
+    await expect(page.getByRole('heading', { name: 'Hello Admin' })).toBeVisible();
+    await expect(page).toHaveURL(`${baseURL}/`);
+});
+
 // Security review 2026-10-30, finding 7: who-is-logged-in, asked as the logout page opens, may answer after the logout;
 // it must not bring the person back
 test('a late answer doesn\'t undo the logout', async ({ page }) => {

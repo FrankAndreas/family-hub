@@ -1,14 +1,31 @@
+import { useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useSearchParams } from 'react-router-dom';
 import { useAuth } from '../AuthContext';
+import { safeNext } from '../next';
 import type { Tile } from '../types';
 import { ERROR } from '../ui';
 import { useResource } from '../useApi';
 
-// The start page: a tile per app, opening the app itself (at home its home address, outside its outside one)
+// The start page: a tile per app, opening the app itself (at home its home address, outside its outside one).
+// With ?next=<app> (an app sent the person here: to log in, or to renew a login in its last week) straight back to
+// that app, if it's one of the start page's. Loading this page already renewed the login (GET /api/me)
 export default function Start() {
     const { t } = useTranslation();
     const { person } = useAuth();
     const { data: tiles, error } = useResource<Tile[]>('/api/tiles');
+    const [params, setParams] = useSearchParams();
+    const next = params.get('next');
+
+    useEffect(() => {
+        if (!next || !tiles) return;
+        const target = safeNext(next, tiles.map(tile => tile.url));
+        if (target) window.location.replace(target);
+        else setParams({}, { replace: true });
+    }, [next, tiles, setParams]);
+
+    // On the way back to the app: no flash of the start page (an unknown ?next= is dropped, and the page shows)
+    if (next && !error) return <p role="status" className="text-slate-400">{t('common.loading')}</p>;
 
     return (
         <>

@@ -1,0 +1,18 @@
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "family-hub-client"
+version = "1.0.0"
+description = "The family apps' side of the family hub's login: who is logged in, and the app's people"
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.12"
+dependencies = []
+
+[tool.setuptools]
+packages = ["family_hub_client"]
+
+[tool.setuptools.package-data]
+family_hub_client = ["py.typed"]
