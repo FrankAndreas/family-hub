@@ -1,11 +1,24 @@
 """The PIN login at home: a cookie every app at home gets; never through the Cloudflare tunnel. Invented people.
 A comment above a test names the review it came from, if any."""
 
-from datetime import timedelta
+import uuid
+from datetime import datetime, timedelta, timezone
 
+import jwt
 from fastapi.testclient import TestClient
-from helpers import ADMIN, ADMIN_PIN, THROUGH_TUNNEL, login, make_person, set_cookie
+from helpers import (
+    ADMIN,
+    ADMIN_PIN,
+    THROUGH_TUNNEL,
+    all_set_cookies,
+    bearer_session,
+    login,
+    make_person,
+    set_cookie,
+    signed,
+)
 
+from app import models
 from app.main import app
 
 
@@ -50,7 +63,7 @@ def test_names_for_the_login_screen(client, db):
 
 
 def test_config_for_the_login_screen(client, configure):
-    assert client.get("/api/config").json() == {"default_language": "de", "pin_reset": False}
+    assert client.get("/api/config").json() == {"default_language": "de", "mails": False}
     configure(DEFAULT_LANGUAGE="en")
     assert client.get("/api/config").json()["default_language"] == "en"
 
@@ -66,3 +79,58 @@ def test_changes_need_the_app_header(client):
     assert bare.post("/api/login", json={"name": ADMIN, "pin": ADMIN_PIN}).status_code == 403
     # Reading needs no header, and the login still counts
     assert bare.get("/api/me").status_code == 200
+
+
+# A login in use doesn't run out (functional review 2026-11-07): the hub's page renews it once it is a day old
+
+
+def aged_login(client, db, days_left=28, manage_sid=None):
+    """A login from a few days ago: tokens that run out in `days_left` days."""
+    admin = models.Person.by_name(db, ADMIN)
+    jti = uuid.uuid4().hex
+    common = {"sub": str(admin.id), "ver": admin.token_version}
+    exp = {"exp": datetime.now(timezone.utc) + timedelta(days=days_left)}
+    session = signed({**common, **exp, "typ": "session", "jti": jti})
+    manage = signed({**common, **exp, "typ": "manage", "sid": manage_sid or jti})
+    client.cookies.set("hub_session", session)
+    client.cookies.set("hub_manage", manage)
+    return session, jti
+
+
+def days_left(token):
+    exp = jwt.decode(token, options={"verify_signature": False})["exp"]
+    return (datetime.fromtimestamp(exp, timezone.utc) - datetime.now(timezone.utc)) / timedelta(days=1)
+
+
+def test_a_fresh_login_isnt_renewed(client):
+    login(client)
+    assert all_set_cookies(client.get("/api/me")) == []
+
+
+def test_a_login_in_use_is_renewed(client, db):
+    old, jti = aged_login(client, db)
+    response = client.get("/api/me")
+    session = set_cookie(response, "hub_session").split(";")[0].split("=", 1)[1]
+    manage = set_cookie(response, "hub_manage").split(";")[0].split("=", 1)[1]
+    assert days_left(session) > 29.9 and days_left(manage) > 29.9
+    claims = jwt.decode(session, options={"verify_signature": False})
+    assert claims["jti"] == jti and jwt.decode(manage, options={"verify_signature": False})["sid"] == jti
+    # Still one login: it manages, and logging out ends every copy of it
+    assert client.get("/api/people").status_code == 200
+    client.post("/api/logout")
+    assert bearer_session(old)["valid"] is False
+
+
+def test_only_the_logins_own_manage_cookie_is_renewed(client, db):
+    aged_login(client, db, manage_sid="another-login")
+    response = client.get("/api/me")
+    assert set_cookie(response, "hub_session")
+    assert not any(c.startswith("hub_manage=") for c in all_set_cookies(response))
+
+
+def test_an_ended_login_isnt_renewed(client, db):
+    old, _ = aged_login(client, db)
+    client.post("/api/logout")
+    client.cookies.set("hub_session", old)
+    response = client.get("/api/me")
+    assert response.status_code == 401 and all_set_cookies(response) == []

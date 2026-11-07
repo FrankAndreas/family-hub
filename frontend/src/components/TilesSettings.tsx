@@ -145,7 +145,7 @@ export default function TilesSettings({ people }: { people: Person[] }) {
                         <span aria-hidden="true" className="text-xl">{tile.icon || '🔗'}</span>
                         <span className="min-w-0 break-words font-medium">{tile.name}</span>
                         <span className="text-sm text-slate-400">{tile.remote_url ? t('tiles.alsoOutside') : t('tiles.homeOnly')}</span>
-                        {tile.app_key && <span className="text-sm text-slate-400">· {t('tiles.peopleCount', { count: tile.people.length })}</span>}
+                        {tile.app_key && <span className="text-sm text-slate-400">· {t('tiles.peopleCount', { count: people.filter(p => p.active && tile.people.includes(p.id)).length })}</span>}
                         <span className="ml-auto flex gap-2 text-sm">
                             <button type="button" disabled={index === 0} className={`${TOUCH} text-slate-400 hover:text-white disabled:opacity-30`}
                                 aria-label={t('tiles.up', { name: tile.name })} onClick={() => move(index, -1)}>↑</button>

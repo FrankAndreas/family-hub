@@ -12,7 +12,9 @@ export function errorMessage(error: unknown): string {
         // Validation errors (422) come as a list
         if (Array.isArray(detail)) detail = 'invalid';
         const { code, ...params } = typeof detail === 'string' ? { code: detail } : (detail ?? {});
-        if (typeof code === 'string' && i18n.exists(`errors.${code}`)) return i18n.t(`errors.${code}`, params);
+        // A number of minutes picks the singular or plural text (errors.locked_one / _other)
+        if (typeof params.minutes === 'number') params.count = params.minutes;
+        if (typeof code === 'string' && i18n.exists(`errors.${code}`, params)) return i18n.t(`errors.${code}`, params);
         if (!error.response) return i18n.t('errors.network');
     }
     return i18n.t('errors.generic');

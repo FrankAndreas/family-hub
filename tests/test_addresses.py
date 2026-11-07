@@ -127,3 +127,22 @@ def test_a_link_confirms_only_the_waiting_address(client, db, mail):
     assert refused.status_code == 400 and refused.json()["detail"] == "email_link_invalid"
     db.refresh(lena)
     assert lena.email is None
+
+
+# Functional review 2026-11-07: the "link expired" message says to save the address again, so that sends a new link
+def test_saving_the_waiting_address_again_after_the_link_expired(client, db, mail):
+    login(client)
+    lena = add_person(client, "Lena", email="lena@example.org")
+    mailer.flush()
+    db.query(models.EmailConfirm).update({models.EmailConfirm.expires_at: utcnow() - timedelta(minutes=1)})
+    db.commit()
+    again = client.patch(f"/api/people/{lena['id']}", json={"email": "lena@example.org"})
+    mailer.flush()
+    assert again.status_code == 200 and len(mail.mails) == 2
+    assert client.post("/api/email-confirm", json={"token": confirm_link_token(mail)}).status_code == 200
+    # While a link works, saving the form sends nothing more
+    client.patch(f"/api/people/{lena['id']}", json={"email": "max@example.org"})
+    mailer.flush()
+    client.patch(f"/api/people/{lena['id']}", json={"email": "max@example.org", "color": "#123456"})
+    mailer.flush()
+    assert len(mail.mails) == 3

@@ -80,6 +80,16 @@ def claim(db: Session, kind: Kind, token: str) -> Link | None:
     return cast(Link, db.query(kind.model).filter(kind.model.token_hash == _hash(token)).one())
 
 
+def has_open(db: Session, kind: Kind, person: models.Person) -> bool:
+    """Whether the person has a link of this kind that still works (unused, not expired)."""
+    return (
+        db.query(kind.model)
+        .filter(kind.model.person_id == person.id, kind.model.used_at.is_(None), kind.model.expires_at >= utcnow())
+        .first()
+        is not None
+    )
+
+
 def end_open(db: Session, kind: Kind, person: models.Person) -> None:
     """The person's open links of this kind stop working; the caller commits."""
     db.query(kind.model).filter(kind.model.person_id == person.id, kind.model.used_at.is_(None)).update(

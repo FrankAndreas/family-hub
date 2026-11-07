@@ -98,9 +98,12 @@ def change_person(
     _not_another_parent(actor, person)
     fields = body.model_fields_set
     new_email = body.email if "email" in fields else person.email
-    # The address the form shows may be the one still waiting for confirmation: saving it again changes nothing
+    # The address the form shows may be the one still waiting for confirmation: saving it again changes nothing, but
+    # mails a new link when the last one expired (the "link expired" message says to save the address again)
+    send_again = False
     if "email" in fields and new_email is not None and new_email == person.email_pending:
         fields = fields - {"email"}
+        send_again = addresses.link_lost(db, person)
     if person.id == actor.id and "email" in fields and new_email != person.email:
         # The address is the way back in when the PIN is forgotten: a browser left logged in isn't enough to change it
         if not body.current_pin:
@@ -126,7 +129,7 @@ def change_person(
         if "language" in fields:
             person.language = body.language
         db.commit()
-    if confirm_due:
+    if confirm_due or send_again:
         addresses.send_confirmation(db, person)
     return schemas.PersonOut.of(person)
 

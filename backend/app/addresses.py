@@ -78,6 +78,12 @@ def send_confirmation(db: Session, person: models.Person) -> None:
     mailer.send_link(to, texts["subject"], text, link, "Confirmation")
 
 
+def link_lost(db: Session, person: models.Person) -> bool:
+    """The person's address waits, but no link to it works any more (expired or used): saving it again sends a new
+    one, as the "link expired" message says."""
+    return person.email_pending is not None and not links.has_open(db, KIND, person)
+
+
 def confirm(db: Session, token: str) -> None:
     """The address the link was mailed to becomes the person's address. The caller commits."""
     invalid = api_error(400, "email_link_invalid")

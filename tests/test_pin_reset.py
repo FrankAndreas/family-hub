@@ -111,7 +111,7 @@ def test_off_without_settings(client, db, monkeypatch, configure):
     sent = []
     monkeypatch.setattr(mailer, "resend_send", lambda *args: sent.append(args))
     with_email(db)
-    assert client.get("/api/config").json()["pin_reset"] is False
+    assert client.get("/api/config").json()["mails"] is False
     assert ask(client).status_code == 200
     assert sent == []
 
