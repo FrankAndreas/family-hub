@@ -1,10 +1,11 @@
-"""The start page's tiles: at home every app with its home address, outside only those with an outside address."""
+"""The start page's tiles: at home every app with its home address, outside only those with an outside address; what
+parents set on a tile."""
 
-from test_cloudflare import access, outside, token  # noqa: F401
-
-from helpers import add_person, login, make_person
+from helpers import add_person, login, make_person, outside, token
 
 BUDGET = {"name": "Budget", "icon": "💰", "local_url": "https://budget.local.example.ch", "remote_url": None}
+
+
 MEALS = {
     "name": "Essen",
     "icon": "🍲",
@@ -29,7 +30,7 @@ def test_home_shows_all_with_home_addresses(client):
     ]
 
 
-def test_outside_shows_only_outside_tiles(client, db, access):  # noqa: F811
+def test_outside_shows_only_outside_tiles(client, db, access):
     make_person(db, "Mama", role="PARENT", email="mama@example.ch")
     login(client)
     add(client, BUDGET)
@@ -111,3 +112,27 @@ def test_start_page_shows_own_apps(client):
     login(client, "Lena", "5678")
     # A keyed app only for the people on its list; a plain link for everyone
     assert [t["name"] for t in client.get("/api/tiles").json()] == ["Essen"]
+
+
+def test_parents_switch_email_sharing_on_a_tile(client):
+    login(client)
+    body = {"name": "Bewerbungen", "local_url": "https://job.local.example.ch", "app_key": "jobs"}
+    tile = client.post("/api/tiles", json=body).json()
+    assert tile["share_email"] is False
+    assert client.patch(f"/api/tiles/{tile['id']}", json={"share_email": True}).json()["share_email"] is True
+
+
+# hub#12: a tile may name its app's Cloudflare Access application (its AUD tag). Then a Cloudflare login counts for that
+# app only when Cloudflare made it for that application: one leaked from another family app, or the hub, gets nowhere
+MEALS_AUD = "a" * 64
+
+
+def test_parents_set_a_tiles_cloudflare_application(client):
+    login(client)
+    body = {"name": "Essen", "local_url": "https://essen.local.example.ch", "app_key": "meals"}
+    tile = client.post("/api/tiles", json=body).json()
+    assert tile["cf_audience"] is None
+    assert client.patch(f"/api/tiles/{tile['id']}", json={"cf_audience": MEALS_AUD}).json()["cf_audience"] == MEALS_AUD
+    # Cloudflare's tags are 64 hex characters; anything else is a typo
+    assert client.patch(f"/api/tiles/{tile['id']}", json={"cf_audience": "essen"}).status_code == 422
+    assert client.patch(f"/api/tiles/{tile['id']}", json={"cf_audience": None}).json()["cf_audience"] is None

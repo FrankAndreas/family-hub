@@ -1,80 +1,14 @@
-"""The deferred minors of the security review of the hub hardening (2026-10-30), each pinned by a test.
-Invented people and addresses."""
+"""An e-mail address counts only once a link mailed to it was opened: a parent can't hand someone else's address (their
+Cloudflare login, their reset channel) to a child or a new person (security review 2026-10-30, a deferred minor).
+Invented people and addresses. A comment above a test names the review it came from, if any."""
 
 import re
-import threading
-import time
 from datetime import timedelta
 
-from fastapi.testclient import TestClient
-from helpers import APP_HEADER, THROUGH_TUNNEL, add_person, login, make_person
-from test_pin_reset import ask, confirm, mail, with_email  # noqa: F401
+from helpers import own_id, THROUGH_TUNNEL, add_person, login, make_person
 
-from app import confirm_email, links, mailer, models, pin_reset, pins
-from app.main import app
+from app import confirm_email, mailer, models
 from app.timeutil import utcnow
-
-
-def device():
-    return TestClient(app, headers=APP_HEADER)
-
-
-def at_once(count, work):
-    threads = [threading.Thread(target=work) for _ in range(count)]
-    for thread in threads:
-        thread.start()
-    for thread in threads:
-        thread.join()
-
-
-# 4. A reset link works once even when it is used twice at the same moment; the hourly limit holds the same way
-def test_a_link_works_once_even_at_the_same_moment(client, db, mail, monkeypatch):  # noqa: F811
-    with_email(db)
-    ask(client)
-    token = mail.token()
-    real = pins.new_pin
-
-    def slow(person, pin):
-        time.sleep(0.2)
-        real(person, pin)
-
-    monkeypatch.setattr(pins, "new_pin", slow)
-    codes: list[int] = []
-    at_once(2, lambda: codes.append(confirm(device(), token).status_code))
-    assert sorted(codes) == [200, 400]
-
-
-def test_three_per_hour_at_the_same_moment(client, db, mail, monkeypatch):  # noqa: F811
-    with_email(db)
-    real = links.create
-
-    def slow(db_, kind, person, **fields):
-        time.sleep(0.1)
-        return real(db_, kind, person, **fields)
-
-    monkeypatch.setattr(links, "create", slow)
-    at_once(6, lambda: device().post("/api/pin-reset", json={"name": "Admin"}))
-    mailer.flush()
-    assert len(mail.mails) == pin_reset.MAX_PER_HOUR
-
-
-# 5. The answer doesn't wait for the mail: how long it takes would tell who has an address
-def test_answer_doesnt_wait_for_the_mail(client, db, mail, monkeypatch):  # noqa: F811
-    with_email(db)
-    release = threading.Event()
-
-    def slow(*args):
-        release.wait(5)
-        mail(*args)
-
-    monkeypatch.setattr(mailer, "resend_send", slow)
-    start = time.monotonic()
-    response = client.post("/api/pin-reset", json={"name": "Admin"})
-    took = time.monotonic() - start
-    release.set()
-    mailer.flush()
-    assert response.status_code == 200 and took < 1
-    assert len(mail.mails) == 1
 
 
 # 9. An address counts only once a link mailed to it was opened: a parent can't hand someone else's address (their
@@ -89,7 +23,7 @@ def confirm_link_token(outbox) -> str:
     return found.group(1)
 
 
-def test_new_address_counts_after_confirmation(client, db, mail):  # noqa: F811
+def test_new_address_counts_after_confirmation(client, db, mail):
     login(client)
     added = add_person(client, "Lena", email="lena@example.org")
     assert (added["email"], added["email_pending"]) == (None, "lena@example.org")
@@ -97,7 +31,8 @@ def test_new_address_counts_after_confirmation(client, db, mail):  # noqa: F811
     assert mail.mails[-1]["to"] == ["lena@example.org"]
     token = confirm_link_token(mail)
     # Not yet a way back in
-    ask(client, "Lena")
+    client.post("/api/pin-reset", json={"name": "Lena"})
+    mailer.flush()
     assert len(mail.mails) == 1
     assert client.post("/api/email-confirm", json={"token": token}).status_code == 200
     lena = person_named(client, "Lena")
@@ -106,7 +41,7 @@ def test_new_address_counts_after_confirmation(client, db, mail):  # noqa: F811
     assert again.status_code == 400 and again.json()["detail"] == "email_link_invalid"
 
 
-def test_confirm_link_expires(client, db, mail):  # noqa: F811
+def test_confirm_link_expires(client, db, mail):
     login(client)
     add_person(client, "Lena", email="lena@example.org")
     mailer.flush()
@@ -115,13 +50,13 @@ def test_confirm_link_expires(client, db, mail):  # noqa: F811
     assert client.post("/api/email-confirm", json={"token": confirm_link_token(mail)}).status_code == 400
 
 
-def test_clearing_an_address_is_immediate(client, db, mail):  # noqa: F811
+def test_clearing_an_address_is_immediate(client, db, mail):
     login(client)
     lena = make_person(db, "Lena", email="lena@example.org")
     assert client.patch(f"/api/people/{lena.id}", json={"email": None}).json()["email"] is None
 
 
-def test_address_taken_meanwhile(client, db, mail):  # noqa: F811
+def test_address_taken_meanwhile(client, db, mail):
     login(client)
     add_person(client, "Lena", email="same@example.org")
     mailer.flush()
@@ -133,7 +68,7 @@ def test_address_taken_meanwhile(client, db, mail):  # noqa: F811
     assert taken.status_code == 409 and taken.json()["detail"] == "email_taken"
 
 
-def test_confirm_not_through_the_tunnel(client, db, mail):  # noqa: F811
+def test_confirm_not_through_the_tunnel(client, db, mail):
     login(client)
     add_person(client, "Lena", email="lena@example.org")
     mailer.flush()
@@ -152,7 +87,7 @@ def test_nas_command_prints_a_confirm_link(client, db, configure, capsys):
     assert confirm_email.main(["Max"]) == 1
 
 
-def test_saving_again_with_the_waiting_address_changes_nothing(client, db, mail):  # noqa: F811
+def test_saving_again_with_the_waiting_address_changes_nothing(client, db, mail):
     login(client)
     me = client.get("/api/me").json()["id"]
     client.patch(f"/api/people/{me}", json={"email": "admin@example.org", "current_pin": "1234"})
@@ -165,9 +100,23 @@ def test_saving_again_with_the_waiting_address_changes_nothing(client, db, mail)
     assert len(mail.mails) == sent
 
 
+# Hub hardening (spec 2026-10-30), part 2
+def test_own_email_needs_pin(client):
+    login(client)
+    me = own_id(client)
+    missing = client.patch(f"/api/people/{me}", json={"email": "admin@example.org"})
+    assert missing.status_code == 400 and missing.json()["detail"] == "pin_needed"
+    wrong = client.patch(f"/api/people/{me}", json={"email": "admin@example.org", "current_pin": "0000"})
+    assert wrong.status_code == 401 and wrong.json()["detail"] == "wrong_pin"
+    right = client.patch(f"/api/people/{me}", json={"email": "admin@example.org", "current_pin": "1234"})
+    assert right.status_code == 200 and right.json()["email_pending"] == "admin@example.org"
+    lena = add_person(client, "Lena")
+    assert client.patch(f"/api/people/{lena['id']}", json={"email": "lena@example.org"}).status_code == 200
+
+
 # Second check (tests review 2026-11-07): a new address ends the old links, but even an open one only confirms the
 # address that is still waiting
-def test_a_link_confirms_only_the_waiting_address(client, db, mail):  # noqa: F811
+def test_a_link_confirms_only_the_waiting_address(client, db, mail):
     login(client)
     added = add_person(client, "Lena", email="lena@example.org")
     mailer.flush()
