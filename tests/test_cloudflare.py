@@ -8,7 +8,7 @@ import pytest
 from cryptography.hazmat.primitives.asymmetric import rsa
 from helpers import THROUGH_TUNNEL, make_person
 
-from app import cloudflare
+from app import cloudflare, models
 
 TEAM = "family.cloudflareaccess.com"
 AUD = "aud-of-the-hub"
@@ -93,8 +93,21 @@ def test_certs_fetched_again_after_an_hour(client, db, access, monkeypatch):
 
 def test_apps_pass_the_cloudflare_token_to_the_session(client, db, access):
     make_person(db, "Mama", role="PARENT", email="mama@example.ch")
-    found = client.get("/api/session", headers={"Cf-Access-Jwt-Assertion": token(aud="aud-of-the-apps")}).json()
+    found = client.get("/api/session", headers=outside(token(aud="aud-of-the-apps"))).json()
     assert found["valid"] is True and found["person"]["name"] == "Mama"
-    assert (
-        client.get("/api/session", headers={"Cf-Access-Jwt-Assertion": token("x@example.ch")}).json()["valid"] is False
-    )
+    assert client.get("/api/session", headers=outside(token("x@example.ch"))).json()["valid"] is False
+
+
+def test_a_cloudflare_token_counts_for_nothing_at_home(client, db, access):
+    """Security review 2026-11-07: without Cf-Connecting-Ip the request didn't come through Cloudflare, so its token
+    may have leaked (an app's log); at home only the hub's own login counts."""
+    make_person(db, "Mama", role="PARENT", email="mama@example.ch")
+    tile = models.Tile(name="Budget", local_url="https://budget.local.example.ch", app_key="budget")
+    tile.people = [models.Person.by_name(db, "Mama")]
+    db.add(tile)
+    db.commit()
+    at_home = {"Cf-Access-Jwt-Assertion": token()}
+    assert client.get("/api/session", headers=at_home).json()["valid"] is False
+    assert client.get("/api/session?app=budget", headers=at_home).json()["valid"] is False
+    assert client.get("/api/apps/budget/people", headers=at_home).status_code == 401
+    assert client.get("/api/me", headers=at_home).status_code == 401

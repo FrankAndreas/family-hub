@@ -95,15 +95,13 @@ def test_an_apps_own_audience_only(client, db, access):  # noqa: F811
     tile = budget(db, mama)
     tile.cf_audience = MEALS_AUD
     db.commit()
-    for headers in ({}, THROUGH_TUNNEL):
-        own = {**headers, "Cf-Access-Jwt-Assertion": token(aud=MEALS_AUD)}
-        other = {**headers, "Cf-Access-Jwt-Assertion": token()}
-        assert client.get("/api/session?app=budget", headers=own).json()["access"] is True
-        assert client.get("/api/session?app=budget", headers=other).json()["valid"] is False
-        assert client.get("/api/apps/budget/people", headers=own).status_code == 200
-        assert client.get("/api/apps/budget/people", headers=other).status_code == 401
+    own, other = outside(token(aud=MEALS_AUD)), outside(token())
+    assert client.get("/api/session?app=budget", headers=own).json()["access"] is True
+    assert client.get("/api/session?app=budget", headers=other).json()["valid"] is False
+    assert client.get("/api/apps/budget/people", headers=own).status_code == 200
+    assert client.get("/api/apps/budget/people", headers=other).status_code == 401
     # Without the app, or for an app whose tile names no application, every family application counts as before
-    assert client.get("/api/session", headers={"Cf-Access-Jwt-Assertion": token()}).json()["valid"] is True
+    assert client.get("/api/session", headers=outside(token())).json()["valid"] is True
     tile.cf_audience = None
     db.commit()
     assert client.get("/api/session?app=budget", headers=outside(token())).json()["access"] is True

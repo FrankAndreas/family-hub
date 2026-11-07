@@ -37,7 +37,10 @@ def _login(
 ) -> AppLogin:
     """The login as an app passes it: the hub login (Bearer) at home, or the Cloudflare Access token (as Cloudflare
     sent it, Cf-Access-Jwt-Assertion) from outside; else the browser's own login. A Cloudflare token for an app whose
-    tile names its Access application counts only when made for that application (hub#12)."""
+    tile names its Access application counts only when made for that application (hub#12).
+
+    Home and outside are told apart only by Cf-Connecting-Ip (security review 2026-11-07): at home a Cloudflare token
+    counts for nothing, so one that leaked can't be used there without going through Cloudflare."""
     tile = models.Tile.by_key(db, app_key) if app_key else None
     audience = tile.cf_audience if tile else None
     if auth.through_tunnel(request):
@@ -46,8 +49,6 @@ def _login(
         person = cloudflare.person_for(request, db, audience)
     elif credentials is not None:
         person = auth.person_for_token(db, credentials.credentials)
-    elif cloudflare.HEADER in request.headers:
-        person = cloudflare.person_for(request, db, audience)
     else:
         person = auth.current_person_or_none(request, db)
     return AppLogin(person, tile)
