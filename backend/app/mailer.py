@@ -22,11 +22,11 @@ _pending: list[Future] = []
 
 
 def is_configured() -> bool:
-    return all(config.env(name) for name in ("RESEND_API_KEY", "MAIL_FROM", "HUB_PUBLIC_URL"))
+    return config.settings().mail_configured
 
 
 def resend_send(mail_from: str, to: list[str], subject: str, text: str, html_body: str) -> None:
-    outbox = config.env("MAIL_OUTBOX")
+    outbox = config.settings().mail_outbox
     if outbox:
         # Only the browser tests set it: they read the mails from this file instead of sending them
         with open(outbox, "a", encoding="utf-8") as file:
@@ -36,7 +36,7 @@ def resend_send(mail_from: str, to: list[str], subject: str, text: str, html_bod
         RESEND_URL,
         data=json.dumps({"from": mail_from, "to": to, "subject": subject, "text": text, "html": html_body}).encode(),
         headers={
-            "Authorization": f"Bearer {config.env('RESEND_API_KEY')}",
+            "Authorization": f"Bearer {config.settings().resend_api_key}",
             "Content-Type": "application/json",
             "User-Agent": "family-hub",
         },
@@ -62,7 +62,7 @@ def send_link(to: str, subject: str, text: str, link: str, kind: str) -> None:
     """Mail `text` (which contains `link`) to one address, in the background. `kind` names it in a failure's log
     line."""
     text, html_body = _bodies(text, link)
-    mail_from = config.env("MAIL_FROM")
+    mail_from = config.settings().mail_from
     # Looked up now, not at import: tests replace it
     send = resend_send
 

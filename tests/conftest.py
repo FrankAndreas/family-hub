@@ -26,7 +26,7 @@ import pytest  # noqa: E402
 bcrypt.gensalt = functools.partial(bcrypt.gensalt, rounds=4)
 from fastapi.testclient import TestClient  # noqa: E402
 
-from app import database, models  # noqa: E402
+from app import config, database, models  # noqa: E402
 from app.main import app  # noqa: E402
 from app.seed import seed_admin  # noqa: E402
 from helpers import APP_HEADER  # noqa: E402
@@ -40,6 +40,24 @@ def fresh_db():
     with database.SessionLocal() as session:
         seed_admin(session)
     yield
+    # Settings a test changed (configure) end with it
+    config.reload()
+
+
+@pytest.fixture
+def configure(monkeypatch):
+    """Change settings for one test, by their environment variable: configure(COOKIE_DOMAIN="local.example.ch");
+    None unsets one."""
+
+    def change(**env: str | None) -> None:
+        for name, value in env.items():
+            if value is None:
+                monkeypatch.delenv(name, raising=False)
+            else:
+                monkeypatch.setenv(name, value)
+        config.reload()
+
+    return change
 
 
 @pytest.fixture

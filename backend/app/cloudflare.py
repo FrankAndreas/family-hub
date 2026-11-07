@@ -54,8 +54,8 @@ def _key(team: str, kid: str | None) -> dict | None:
 def person_for_token(db: Session, token: str | None, audience: str | None = None) -> models.Person | None:
     """The person of a Cloudflare token made for one of CF_AUDIENCE's applications, or only for `audience` (an app's
     own application, hub#12)."""
-    team = config.env("CF_TEAM_DOMAIN")
-    audiences = [audience] if audience else [a.strip() for a in config.env("CF_AUDIENCE").split(",") if a.strip()]
+    team = config.settings().cf_team_domain
+    audiences = [audience] if audience else list(config.settings().cf_audience)
     if not token or not team or not audiences:
         return None
     try:

@@ -16,9 +16,9 @@ KEY = rsa.generate_private_key(public_exponent=65537, key_size=2048)
 
 
 @pytest.fixture
-def access(monkeypatch):
-    monkeypatch.setenv("CF_TEAM_DOMAIN", TEAM)
-    monkeypatch.setenv("CF_AUDIENCE", f"{AUD}, aud-of-the-apps")
+def access(monkeypatch, configure):
+    configure(CF_TEAM_DOMAIN=TEAM)
+    configure(CF_AUDIENCE=f"{AUD}, aud-of-the-apps")
     jwk = json.loads(jwt.algorithms.RSAAlgorithm.to_jwk(KEY.public_key()))
     fetched = []
 
@@ -76,9 +76,9 @@ def test_refused(client, db, access):
     assert client.get("/api/me", headers=THROUGH_TUNNEL).status_code == 401
 
 
-def test_not_configured(client, db, monkeypatch):
+def test_not_configured(client, db, configure):
     make_person(db, "Mama", role="PARENT", email="mama@example.ch")
-    monkeypatch.delenv("CF_TEAM_DOMAIN", raising=False)
+    configure(CF_TEAM_DOMAIN=None)
     assert client.get("/api/me", headers=outside(token())).status_code == 401
 
 

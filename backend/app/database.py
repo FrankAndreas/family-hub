@@ -4,7 +4,7 @@ from sqlalchemy import MetaData, create_engine, event
 from sqlalchemy.engine import Engine, make_url
 from sqlalchemy.orm import declarative_base, sessionmaker
 
-SQLALCHEMY_DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./data/hub.db")
+from . import config
 
 
 def ensure_sqlite_folder(url: str) -> None:
@@ -24,9 +24,9 @@ def enable_foreign_keys(engine: Engine) -> None:
         cursor.close()
 
 
-ensure_sqlite_folder(SQLALCHEMY_DATABASE_URL)
-# check_same_thread is needed for SQLite with FastAPI's thread pool
-engine = create_engine(SQLALCHEMY_DATABASE_URL, connect_args={"check_same_thread": False})
+# Connects only when first used: the folder is made at startup (main.lifespan). check_same_thread is needed for SQLite
+# with FastAPI's thread pool
+engine = create_engine(config.settings().database_url, connect_args={"check_same_thread": False})
 enable_foreign_keys(engine)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 

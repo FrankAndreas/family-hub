@@ -1,9 +1,10 @@
 import { useState, type FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
-import api, { errorMessage } from '../api';
+import api from '../api';
 import { useAuth } from '../AuthContext';
 import type { Person, Role } from '../types';
 import { BUTTON, BUTTON_SECONDARY, CARD, ERROR, INPUT, TOUCH } from '../ui';
+import { useAction } from '../useApi';
 import PinInput from './PinInput';
 import { useFormFocus } from './useFormFocus';
 
@@ -23,7 +24,7 @@ export default function PeopleSettings({ people, loadError, reload }: { people: 
     const { t } = useTranslation();
     const { person: me } = useAuth();
     const [form, setForm] = useState<Form | null>(null);
-    const [error, setError] = useState('');
+    const { run, error } = useAction(reload);
     const formRef = useFormFocus(form ? String(form.id) : null);
 
     const save = async (e: FormEvent) => {
@@ -33,7 +34,7 @@ export default function PeopleSettings({ people, loadError, reload }: { people: 
         const newParent = form.role === 'PARENT' && form.oldRole !== 'PARENT' && form.id !== me?.id;
         if (newParent && !confirm(t('people.confirmParent', { name: form.name }))) return;
         const body = { name: form.name, email: form.email.trim() || null, role: form.role, color: form.color };
-        try {
+        await run(async () => {
             if (form.id === null) {
                 await api.post('/api/people', { ...body, pin: form.pin });
             } else {
@@ -43,11 +44,7 @@ export default function PeopleSettings({ people, loadError, reload }: { people: 
                 await api.patch(`/api/people/${form.id}`, { ...body, active: form.active, ...(own ? { current_pin: form.currentPin } : {}) });
             }
             setForm(null);
-            setError('');
-            reload();
-        } catch (err) {
-            setError(errorMessage(err));
-        }
+        });
     };
 
     const edit = (p: Person) =>

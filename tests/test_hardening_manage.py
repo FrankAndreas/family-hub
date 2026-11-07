@@ -38,8 +38,8 @@ def test_manage_cookie_of_another_login_is_refused(client):
     assert refused.status_code == 403 and refused.json()["detail"] == "login_again"
 
 
-def test_manage_cookie_flags(client, monkeypatch):
-    monkeypatch.setenv("COOKIE_DOMAIN", "local.example.ch")
+def test_manage_cookie_flags(client, configure):
+    configure(COOKIE_DOMAIN="local.example.ch")
     header = manage_cookie_header(login(client))
     assert "Domain=" not in header
     assert "HttpOnly" in header and "SameSite=strict" in header and "Path=/api" in header

@@ -34,10 +34,10 @@ class Outbox:
 
 
 @pytest.fixture
-def mail(monkeypatch):
-    monkeypatch.setenv("RESEND_API_KEY", "test")
-    monkeypatch.setenv("MAIL_FROM", "hub@example.org")
-    monkeypatch.setenv("HUB_PUBLIC_URL", "https://home.local.example.ch")
+def mail(monkeypatch, configure):
+    configure(RESEND_API_KEY="test")
+    configure(MAIL_FROM="hub@example.org")
+    configure(HUB_PUBLIC_URL="https://home.local.example.ch")
     outbox = Outbox()
     monkeypatch.setattr(mailer, "resend_send", outbox)
     return outbox
@@ -127,9 +127,8 @@ def test_not_through_the_tunnel(client, db, mail):
     assert refused.status_code == 403
 
 
-def test_off_without_settings(client, db, monkeypatch):
-    for name in ("RESEND_API_KEY", "MAIL_FROM", "HUB_PUBLIC_URL"):
-        monkeypatch.delenv(name, raising=False)
+def test_off_without_settings(client, db, monkeypatch, configure):
+    configure(RESEND_API_KEY=None, MAIL_FROM=None, HUB_PUBLIC_URL=None)
     sent = []
     monkeypatch.setattr(mailer, "resend_send", lambda *args: sent.append(args))
     with_email(db)
@@ -161,8 +160,8 @@ def test_mail_in_person_language(client, db, mail):
     assert [m["subject"] for m in mail.mails] == ["Family hub: new PIN", "Familien-Hub: neue PIN"]
 
 
-def test_nas_command_prints_a_working_link(client, db, monkeypatch, capsys):
-    monkeypatch.setenv("HUB_PUBLIC_URL", "https://home.local.example.ch")
+def test_nas_command_prints_a_working_link(client, db, configure, capsys):
+    configure(HUB_PUBLIC_URL="https://home.local.example.ch")
     assert reset_pin.main([ADMIN]) == 0
     found = LINK.search(capsys.readouterr().out)
     assert found

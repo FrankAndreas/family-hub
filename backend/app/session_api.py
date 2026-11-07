@@ -3,6 +3,7 @@
 An app reads the login (the `hub_session` cookie at home), may check its signature itself with the JWKS, and asks
 /api/session (briefly cached) to honour "log out everywhere", a new PIN and deactivated people."""
 
+from dataclasses import dataclass
 from datetime import timedelta
 
 from fastapi import APIRouter, Depends, Request
@@ -23,9 +24,17 @@ def jwks():
     return keys.jwks()
 
 
+@dataclass
+class AppLogin:
+    """Who an app asks about, and the app (its tile) when it named a known key."""
+
+    person: models.Person | None
+    tile: models.Tile | None
+
+
 def _login(
     request: Request, credentials: HTTPAuthorizationCredentials | None, db: Session, app_key: str | None
-) -> models.Person | None:
+) -> AppLogin:
     """The login as an app passes it: the hub login (Bearer) at home, or the Cloudflare Access token (as Cloudflare
     sent it, Cf-Access-Jwt-Assertion) from outside; else the browser's own login. A Cloudflare token for an app whose
     tile names its Access application counts only when made for that application (hub#12)."""
@@ -41,15 +50,15 @@ def _login(
         person = cloudflare.person_for(request, db, audience)
     else:
         person = auth.current_person_or_none(request, db)
-    if person is not None and tile is not None:
-        _note_use(db, tile, person)
-    return person
+    return AppLogin(person, tile)
 
 
-def _note_use(db: Session, tile: models.Tile, person: models.Person) -> None:
+def note_use(db: Session, login: AppLogin) -> None:
     """The app asked for its key with this person's login: they use it (see tiles_api.change_tile). Kept to the hour,
-    so not every page of an app writes."""
-    access = db.get(models.TileAccess, (tile.id, person.id))
+    so not every page of an app writes. The caller commits."""
+    if login.person is None or login.tile is None:
+        return
+    access = db.get(models.TileAccess, (login.tile.id, login.person.id))
     if access is None:
         return
     now = timeutil.utcnow()
@@ -57,7 +66,6 @@ def _note_use(db: Session, tile: models.Tile, person: models.Person) -> None:
         return
     access.first_used_at = access.first_used_at or now
     access.last_used_at = now
-    db.commit()
 
 
 def caller(
@@ -65,7 +73,7 @@ def caller(
     app: str | None = None,
     credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
     db: Session = Depends(get_db),
-) -> models.Person | None:
+) -> AppLogin:
     """The login for /api/session?app=<key>."""
     return _login(request, credentials, db, app)
 
@@ -75,27 +83,20 @@ def app_caller(
     key: str,
     credentials: HTTPAuthorizationCredentials | None = Depends(_bearer),
     db: Session = Depends(get_db),
-) -> models.Person | None:
+) -> AppLogin:
     """The login for /api/apps/<key>/..."""
     return _login(request, credentials, db, key)
 
 
-def has_access(db: Session, person: models.Person, app_key: str) -> bool:
-    tile = models.Tile.by_key(db, app_key)
-    return tile is not None and person in tile.people
-
-
 @router.get("/api/session", response_model=schemas.SessionOut, response_model_exclude_unset=True)
-def session(
-    app: str | None = None,
-    person: models.Person | None = Depends(caller),
-    db: Session = Depends(get_db),
-):
+def session(app: str | None = None, login: AppLogin = Depends(caller), db: Session = Depends(get_db)):
     """Whether a login still counts; with ?app=<key> also whether the person may use that app. `valid` stays about the
     login, so an app can tell "not logged in" (send to the hub) from "no access" (say so) without a loop."""
-    if person is None:
+    note_use(db, login)
+    db.commit()
+    if login.person is None:
         return schemas.SessionOut(valid=False, person=None)
-    found = schemas.SessionOut(valid=True, person=schemas.AppPerson.model_validate(person))
+    found = schemas.SessionOut(valid=True, person=schemas.AppPerson.model_validate(login.person))
     if app is not None:
-        found.access = has_access(db, person, app)
+        found.access = login.tile is not None and login.person in login.tile.people
     return found

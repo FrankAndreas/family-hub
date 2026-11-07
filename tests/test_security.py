@@ -7,20 +7,20 @@ from fastapi.testclient import TestClient
 from helpers import ADMIN_PIN, APP_HEADER, THROUGH_TUNNEL, login
 from test_cloudflare import access, outside, token  # noqa: F401
 
-from app import auth, cloudflare, config, keys
+from app import cloudflare, config, keys, pins
 from app.main import app
 from app.seed import seed_admin  # noqa: F401
 
 
 def test_parallel_wrong_pins_count_every_try(monkeypatch):
     # Many guesses at once: each one counts, so no more than the allowed few get an answer before the lock
-    real = auth.verify_pin
+    real = pins.verify_pin
 
     def slow(pin, hashed):
         time.sleep(0.05)
         return real(pin, hashed)
 
-    monkeypatch.setattr(auth, "verify_pin", slow)
+    monkeypatch.setattr(pins, "verify_pin", slow)
     codes: list[int] = []
 
     def guess(n):
@@ -32,13 +32,13 @@ def test_parallel_wrong_pins_count_every_try(monkeypatch):
         thread.start()
     for thread in threads:
         thread.join()
-    assert codes.count(401) <= auth.MAX_FAILED_LOGINS
+    assert codes.count(401) <= pins.MAX_FAILED_LOGINS
     assert codes.count(429) == len(codes) - codes.count(401)
 
 
 def test_own_pin_change_counts_wrong_old_pins(client):
     login(client)
-    for _ in range(auth.MAX_FAILED_LOGINS):
+    for _ in range(pins.MAX_FAILED_LOGINS):
         assert client.put("/api/me/pin", json={"old_pin": "0000", "pin": "1357"}).status_code == 401
     locked = client.put("/api/me/pin", json={"old_pin": ADMIN_PIN, "pin": "1357"})
     assert locked.status_code == 429
@@ -73,7 +73,7 @@ def test_unknown_key_id_fetches_the_keys_again_once(client, db, access, monkeypa
 
     make_person(db, "Mama", role="PARENT", email="mama@example.ch")
     # Keys fetched some minutes ago, before Cloudflare rotated: the new kid isn't among them
-    cloudflare._certs[cloudflare.config.env("CF_TEAM_DOMAIN")] = (time.monotonic() - 300, {})
+    cloudflare._certs[cloudflare.config.settings().cf_team_domain] = (time.monotonic() - 300, {})
     assert client.get("/api/me", headers=outside(token())).status_code == 200
     assert len(access) == 1
     # A made-up kid right after doesn't make the hub ask Cloudflare again (one try per minute at most)

@@ -80,7 +80,8 @@ that works once, for 30 minutes, at home only:
 - `MAIL_FROM`: the sender, e.g. `Familien-Hub <hub@<domain>>`;
 - `HUB_PUBLIC_URL`: the hub's address at home, `https://home.local.<domain>`.
 
-Without all three, there's no **Forgot PIN?**. The last resort, also for people without an address, is a link printed
+Without all three, there's no **Forgot PIN?** (the backend's log says so when it starts: "Mails: off"). A
+`HUB_PUBLIC_URL` without `https://` stops the backend at the start, with the reason in its log. The last resort, also for people without an address, is a link printed
 on the NAS:
 
 ```bash

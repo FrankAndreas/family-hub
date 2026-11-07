@@ -8,7 +8,7 @@ from datetime import timedelta
 
 from sqlalchemy.orm import Session
 
-from . import auth, links, mailer, models
+from . import links, mailer, models, pins
 from .errors import api_error
 
 LINK_LIFETIME = timedelta(minutes=30)
@@ -37,7 +37,8 @@ TEXTS = {
 
 
 def create_link(db: Session, person: models.Person) -> str:
-    """A new reset link for the person: the full address, or only the path when HUB_PUBLIC_URL is unset."""
+    """A new reset link for the person: the full address, or only the path when HUB_PUBLIC_URL is unset. The caller
+    commits."""
     return links.create(db, KIND, person)
 
 
@@ -63,7 +64,8 @@ def end_links(db: Session, person: models.Person) -> None:
 
 
 def confirm(db: Session, token: str, pin: str) -> None:
-    """Set the new PIN with a reset link: it ends the person's logins, lifts a lock and every other open link."""
+    """Set the new PIN with a reset link: it ends the person's logins, lifts a lock and every other open link. The
+    caller commits."""
     invalid = api_error(400, "reset_link_invalid")
     reset = links.claim(db, KIND, token)
     if reset is None:
@@ -71,6 +73,5 @@ def confirm(db: Session, token: str, pin: str) -> None:
     person = db.get(models.Person, reset.person_id)
     if person is None or not person.active:
         raise invalid
-    auth.new_pin(person, pin)
+    pins.new_pin(person, pin)
     end_links(db, person)
-    db.commit()

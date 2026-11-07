@@ -13,8 +13,8 @@ def bearer(token):
     return {"Authorization": f"Bearer {token}"}
 
 
-def test_key_made_once_and_kept(tmp_path, monkeypatch):
-    monkeypatch.setenv("DATA_DIR", str(tmp_path))
+def test_key_made_once_and_kept(tmp_path, configure):
+    configure(DATA_DIR=str(tmp_path))
     _, kid = keys.signing_key()
     assert (tmp_path / keys.FILE).stat().st_mode & 0o777 == 0o600
     # A restart reads the same key

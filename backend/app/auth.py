@@ -3,17 +3,13 @@
 At home the PIN login sets the cookie `hub_session` for COOKIE_DOMAIN (e.g. local.<domain>), so every app at home gets
 it and the addresses through Cloudflare never do. A request that came through the Cloudflare tunnel (it carries
 Cf-Connecting-Ip) gets no PIN login and its cookie counts for nothing: outside, only a Cloudflare Access token does.
+
+Here: the hub's tokens and cookies, and who is asking (the dependencies). Checking a PIN is in pins.py.
 """
 
-import hashlib
-import logging
-import math
-import secrets
-import threading
 import uuid
 from datetime import datetime, timedelta, timezone
 
-import bcrypt
 import jwt
 from fastapi import Depends, Request, Response, status
 from sqlalchemy.orm import Session
@@ -22,24 +18,12 @@ from . import cloudflare, config, database, keys, models
 from .errors import api_error
 from .timeutil import utcnow
 
-logger = logging.getLogger(__name__)
-
 COOKIE = "hub_session"
 # Only the hub gets it: managing people, PINs and apps needs it as well (spec 2026-10-30 hub hardening)
 MANAGE_COOKIE = "hub_manage"
 ISSUER = "family-hub"
 ALGORITHM = "EdDSA"
 TOKEN_LIFETIME = timedelta(days=30)
-# A 4-digit PIN is guessable, so lock the person after a few wrong tries. Each lock in a row doubles the next one, up
-# to a day: then about 5 guesses a day are left
-MAX_FAILED_LOGINS = 5
-LOCK_DURATION = timedelta(minutes=15)
-MAX_LOCK_DURATION = timedelta(days=1)
-# A browser the person logged in with before (security review 2026-10-30): wrong PINs from other devices don't lock it
-DEVICE_COOKIE = "hub_device"
-DEVICE_LIFETIME = timedelta(days=365)
-# Known browsers kept per person; the oldest is forgotten first
-MAX_DEVICES = 20
 # The hub's own pages send it with every change; another page on the family's domain can't make a browser send it
 APP_HEADER = "x-requested-with"
 APP_HEADER_VALUE = "hub"
@@ -47,134 +31,8 @@ APP_HEADER_VALUE = "hub"
 TUNNEL_HEADER = "cf-connecting-ip"
 
 
-def get_pin_hash(pin: str) -> str:
-    return bcrypt.hashpw(pin.encode(), bcrypt.gensalt()).decode()
-
-
-def verify_pin(pin: str, hashed: str) -> bool:
-    try:
-        return bcrypt.checkpw(pin.encode(), hashed.encode())
-    except ValueError:
-        # Not a valid bcrypt hash: treat it like a wrong PIN instead of a server error
-        return False
-
-
-def lock_duration(lockouts: int) -> timedelta:
-    """15, 30, 60, ... minutes for the first, second, third lock in a row; at most a day."""
-    duration: timedelta = LOCK_DURATION * 2 ** min(max(lockouts - 1, 0), 10)
-    return min(duration, MAX_LOCK_DURATION)
-
-
 def through_tunnel(request: Request) -> bool:
     return TUNNEL_HEADER in request.headers
-
-
-# One PIN check per person at a time (security review 2026-10-29): parallel guesses would each read the same count of
-# wrong PINs while bcrypt runs, and get far more tries than MAX_FAILED_LOGINS. The backend is one process (uvicorn
-# without workers), so a lock in memory is enough
-_pin_locks: dict[int, threading.Lock] = {}
-_pin_locks_guard = threading.Lock()
-
-
-def _pin_lock(person_id: int) -> threading.Lock:
-    with _pin_locks_guard:
-        return _pin_locks.setdefault(person_id, threading.Lock())
-
-
-def new_pin(person: models.Person, pin: str) -> None:
-    """A new PIN ends every login made with the old one and lifts a lock."""
-    person.pin_hash = get_pin_hash(pin)
-    person.token_version += 1
-    person.failed_logins = 0
-    person.lockouts = 0
-    person.locked_until = None
-
-
-def _secret_hash(secret: str) -> str:
-    return hashlib.sha256(secret.encode()).hexdigest()
-
-
-def known_device(db: Session, person: models.Person, secret: str | None) -> models.KnownDevice | None:
-    if not secret:
-        return None
-    return (
-        db.query(models.KnownDevice)
-        .filter(models.KnownDevice.person_id == person.id, models.KnownDevice.secret_hash == _secret_hash(secret))
-        .first()
-    )
-
-
-def check_pin(db: Session, person: models.Person, pin: str, wrong: Exception, device_secret: str | None = None) -> None:
-    """The person's PIN, counting wrong ones and locking the person after too many; raises `wrong` or 429.
-
-    From a browser the person logged in with before, the lock doesn't apply and wrong PINs count against that browser
-    alone: after MAX_FAILED_LOGINS of them it is unknown again."""
-    with _pin_lock(person.id):
-        # What other requests counted meanwhile
-        db.refresh(person)
-        device = known_device(db, person, device_secret)
-        now = utcnow()
-        if device is None and person.locked_until and person.locked_until > now:
-            minutes = math.ceil((person.locked_until - now).total_seconds() / 60)
-            raise api_error(status.HTTP_429_TOO_MANY_REQUESTS, "locked", minutes=minutes)
-        if not verify_pin(pin, person.pin_hash):
-            if device is not None:
-                device.failed_logins += 1
-                if device.failed_logins >= MAX_FAILED_LOGINS:
-                    db.delete(device)
-            else:
-                person.failed_logins += 1
-                if person.failed_logins >= MAX_FAILED_LOGINS:
-                    person.failed_logins = 0
-                    person.lockouts += 1
-                    person.locked_until = now + lock_duration(person.lockouts)
-            db.commit()
-            raise wrong
-        if device is not None:
-            device.failed_logins = 0
-        person.failed_logins = 0
-        person.lockouts = 0
-        person.locked_until = None
-        db.commit()
-
-
-def authenticate(db: Session, name: str, pin: str, device_secret: str | None = None) -> models.Person:
-    """The active person with this name and PIN; counts wrong PINs and locks the person after too many."""
-    wrong = api_error(status.HTTP_401_UNAUTHORIZED, "wrong_name_or_pin")
-    person = models.Person.by_name(db, name)
-    if person is None or not person.active:
-        raise wrong
-    check_pin(db, person, pin, wrong, device_secret)
-    return person
-
-
-def remember_device(db: Session, response: Response, person: models.Person, secret: str | None) -> None:
-    """After a correct login: this browser is known for the person from now on. Its cookie stays with the hub (no
-    domain), so the other apps at home never get it."""
-    if known_device(db, person, secret) is None:
-        secret = secret or secrets.token_urlsafe(32)
-        db.add(models.KnownDevice(person_id=person.id, secret_hash=_secret_hash(secret)))
-        db.flush()
-        kept = (
-            db.query(models.KnownDevice.id)
-            .filter(models.KnownDevice.person_id == person.id)
-            .order_by(models.KnownDevice.id.desc())
-            .limit(MAX_DEVICES)
-        )
-        db.query(models.KnownDevice).filter(
-            models.KnownDevice.person_id == person.id, models.KnownDevice.id.not_in(kept.scalar_subquery())
-        ).delete(synchronize_session=False)
-        db.commit()
-    assert secret is not None
-    response.set_cookie(
-        DEVICE_COOKIE,
-        secret,
-        max_age=int(DEVICE_LIFETIME.total_seconds()),
-        path="/api",
-        secure=config.env("COOKIE_INSECURE") != "1",
-        httponly=True,
-        samesite="strict",
-    )
 
 
 def require_app_header(request: Request) -> None:
@@ -237,8 +95,8 @@ def person_for_token(db: Session, token: str | None) -> models.Person | None:
 
 
 def end_login(db: Session, token: str | None) -> None:
-    """ "Log out": this session token is no login any more, here or in any app. Ended logins that would have expired
-    by now are dropped."""
+    """ "Log out": this session token is no login any more, here or in any app (the caller commits). Ended logins that
+    would have expired by now are dropped."""
     now = utcnow()
     db.query(models.EndedLogin).filter(models.EndedLogin.expires_at < now).delete()
     claims = token_claims(token, "session")
@@ -246,35 +104,38 @@ def end_login(db: Session, token: str | None) -> None:
     if isinstance(jti, str) and db.get(models.EndedLogin, jti) is None:
         expires = datetime.fromtimestamp(int(claims["exp"]), timezone.utc).replace(tzinfo=None)  # type: ignore[index]
         db.add(models.EndedLogin(jti=jti, expires_at=expires))
-    db.commit()
-
-
-def _secure() -> bool:
-    return config.env("COOKIE_INSECURE") != "1"
 
 
 def set_cookies(response: Response, session: str, manage: str) -> None:
     """The session cookie for every app at home (COOKIE_DOMAIN); the manage cookie for the hub alone (no domain)."""
+    settings = config.settings()
     max_age = int(TOKEN_LIFETIME.total_seconds())
     response.set_cookie(
         COOKIE,
         session,
         max_age=max_age,
-        domain=config.env("COOKIE_DOMAIN") or None,
-        secure=_secure(),
+        domain=settings.cookie_domain,
+        secure=settings.cookie_secure,
         httponly=True,
         samesite="lax",
     )
     response.set_cookie(
-        MANAGE_COOKIE, manage, max_age=max_age, path="/api", secure=_secure(), httponly=True, samesite="strict"
+        MANAGE_COOKIE,
+        manage,
+        max_age=max_age,
+        path="/api",
+        secure=settings.cookie_secure,
+        httponly=True,
+        samesite="strict",
     )
 
 
 def clear_cookies(response: Response) -> None:
+    settings = config.settings()
     response.delete_cookie(
-        COOKIE, domain=config.env("COOKIE_DOMAIN") or None, secure=_secure(), httponly=True, samesite="lax"
+        COOKIE, domain=settings.cookie_domain, secure=settings.cookie_secure, httponly=True, samesite="lax"
     )
-    response.delete_cookie(MANAGE_COOKIE, path="/api", secure=_secure(), httponly=True, samesite="strict")
+    response.delete_cookie(MANAGE_COOKIE, path="/api", secure=settings.cookie_secure, httponly=True, samesite="strict")
 
 
 def current_person_or_none(request: Request, db: Session) -> models.Person | None:

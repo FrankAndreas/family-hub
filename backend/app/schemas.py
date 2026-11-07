@@ -3,6 +3,7 @@ from typing import Annotated
 
 from pydantic import AfterValidator, AliasChoices, BaseModel, ConfigDict, Field, field_serializer, field_validator
 
+from . import models
 from .config import Language
 from .models import Role
 
@@ -42,6 +43,22 @@ class PersonOut(BaseModel):
     at_home: bool = True
     # Whether the parent asking may change this person: themselves and the children, never another parent
     can_edit: bool = True
+
+    @classmethod
+    def of(cls, person: models.Person, at_home: bool = True, can_edit: bool = True) -> "PersonOut":
+        return cls(
+            at_home=at_home,
+            can_edit=can_edit,
+            id=person.id,
+            name=person.name,
+            email=person.email,
+            email_pending=person.email_pending,
+            role=person.role,
+            active=person.active,
+            color=person.color,
+            language=person.language_or_default,
+            language_chosen=person.language is not None,
+        )
 
 
 # What the apps get (README "For apps"): the same person for /api/session and /api/apps/<key>/people

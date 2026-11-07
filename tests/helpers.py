@@ -24,13 +24,13 @@ def add_person(client, name, pin="5678", role="CHILD", email=None, **fields) -> 
 
 def make_person(db, name, pin="5678", role="CHILD", email=None, active=True, color=None):
     """A person straight in the database (before the people API exists in a test)."""
-    from app import auth, models
+    from app import models, pins
 
     person = models.Person(
         name=name,
         name_key=models.name_key(name),
         email=email.casefold() if email else None,
-        pin_hash=auth.get_pin_hash(pin),
+        pin_hash=pins.get_pin_hash(pin),
         role=models.Role(role),
         active=active,
         color=color,

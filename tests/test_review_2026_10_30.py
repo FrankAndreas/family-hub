@@ -3,7 +3,7 @@
 from fastapi.testclient import TestClient
 from helpers import ADMIN, ADMIN_PIN, APP_HEADER, add_person, login
 
-from app import auth, models
+from app import models, pins
 from app.main import app
 
 
@@ -12,7 +12,7 @@ def device():
     return TestClient(app, headers=APP_HEADER)
 
 
-def wrong_pins(client, name=ADMIN, times=auth.MAX_FAILED_LOGINS):
+def wrong_pins(client, name=ADMIN, times=pins.MAX_FAILED_LOGINS):
     for _ in range(times):
         assert client.post("/api/login", json={"name": name, "pin": "0000"}).status_code == 401
 
@@ -62,8 +62,8 @@ def test_a_correct_login_on_a_known_device_lifts_the_lock(client):
     assert try_login(device()) == 200
 
 
-def test_the_device_cookie_stays_with_the_hub(client, monkeypatch):
-    monkeypatch.setenv("COOKIE_DOMAIN", "local.example.ch")
+def test_the_device_cookie_stays_with_the_hub(client, configure):
+    configure(COOKIE_DOMAIN="local.example.ch")
     response = login(client)
     header = next(v for k, v in response.headers.multi_items() if k == "set-cookie" and v.startswith("hub_device="))
     # Other apps at home get the login cookie, never this one
@@ -72,9 +72,9 @@ def test_the_device_cookie_stays_with_the_hub(client, monkeypatch):
 
 
 def test_known_devices_are_capped(client, db):
-    for _ in range(auth.MAX_DEVICES + 5):
+    for _ in range(pins.MAX_DEVICES + 5):
         login(device())
-    assert db.query(models.KnownDevice).count() == auth.MAX_DEVICES
+    assert db.query(models.KnownDevice).count() == pins.MAX_DEVICES
 
 
 # 4. Any page on the family's domain could make a browser send the hub cookie with a change (log out everywhere)
