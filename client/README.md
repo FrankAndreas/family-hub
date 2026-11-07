@@ -28,7 +28,10 @@ client = HubClient(default_app_key="budget")
   minute (only a valid login with access, and an invalid one at home; never "no access" or an outside "not logged
   in"). Raises `HubUnavailable` when the hub doesn't answer as expected: let nobody in then (503).
 - `session.renew`: the hub login is in its last week. Send the browser once through
-  `<public_url>/?next=<the page's address>` (with a guard, e.g. once a day): the hub renews the login and sends it back.
+  `<public_url>/?next=<the page's address>`: the hub renews the login and sends it back. The family apps do it the
+  same way: the backend's login dependency sets the response header `X-Hub-Renew: 1`, and the page, when it loads who
+  is logged in, goes through the hub at most once a day (a time in `localStorage`; without storage not at all, so it
+  can never loop).
 - `client.fetch_people(login)`: the app's people (`[]` when the person asking may not ask); `HubPerson.email_shared`
   says whether the app's tile shares addresses (then `email` is the confirmed address or `None`).
 - `client.hub_url()`, `client.public_url()`, `client.app_key()`: from `HUB_URL`, `HUB_PUBLIC_URL`, `HUB_APP_KEY`.
