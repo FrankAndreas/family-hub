@@ -1,36 +1,13 @@
-"""Apps check a hub login with the public key (JWKS) and ask /api/session whether it still counts."""
+"""Apps ask /api/session whether a login still counts, and whether the app is the person's. A comment above a test
+names the review it came from, if any."""
 
 from datetime import datetime, timedelta, timezone
 
 import jwt
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
-from helpers import login, make_person
+from helpers import THROUGH_TUNNEL, bearer, budget_tile, login, make_person, outside, token
 
 from app import auth, keys, models
-
-
-def bearer(token):
-    return {"Authorization": f"Bearer {token}"}
-
-
-def test_key_made_once_and_kept(tmp_path, configure):
-    configure(DATA_DIR=str(tmp_path))
-    _, kid = keys.signing_key()
-    assert (tmp_path / keys.FILE).stat().st_mode & 0o777 == 0o600
-    # A restart reads the same key
-    keys._loaded.clear()
-    assert keys.signing_key()[1] == kid
-
-
-def test_jwks_verifies_a_hub_token(client):
-    token = login(client).cookies.get("hub_session") or client.cookies.get("hub_session")
-    found = client.get("/api/keys").json()
-    assert client.get("/.well-known/jwks.json").json() == found
-    [jwk] = found["keys"]
-    assert (jwk["kty"], jwk["crv"], jwk["alg"]) == ("OKP", "Ed25519", "EdDSA")
-    assert jwt.get_unverified_header(token)["kid"] == jwk["kid"]
-    claims = jwt.decode(token, jwt.PyJWK(jwk).key, algorithms=["EdDSA"], issuer="family-hub")
-    assert claims["sub"] == "1"
 
 
 def test_session_for_apps(client, db):
@@ -77,9 +54,7 @@ def test_session_invalid(client, db):
 
 def test_session_access_per_app(client, db):
     lena = make_person(db, "Lena")
-    tile = models.Tile(name="Budget", local_url="https://budget.local.example.ch", app_key="budget")
-    db.add(tile)
-    db.commit()
+    tile = budget_tile(db)
     headers = bearer(auth.issue_tokens(lena)[0])
     # The login is valid either way; access says whether this app is hers
     found = client.get("/api/session", params={"app": "budget"}, headers=headers).json()
@@ -89,3 +64,19 @@ def test_session_access_per_app(client, db):
     assert client.get("/api/session", params={"app": "budget"}, headers=headers).json()["access"] is True
     assert client.get("/api/session", params={"app": "nope"}, headers=headers).json()["access"] is False
     assert "access" not in client.get("/api/session", headers=headers).json()
+
+
+# Security review 2026-10-29
+def test_session_through_the_tunnel_ignores_a_hub_token(client, db):
+    hub_token = login(client).cookies.get("hub_session") or client.cookies.get("hub_session")
+    headers = {"Authorization": f"Bearer {hub_token}"}
+    assert client.get("/api/session", headers=headers).json()["valid"] is True
+    # The same token from an outside request (the app passes Cf-Connecting-Ip on): only Cloudflare's counts
+    assert client.get("/api/session", headers={**headers, **THROUGH_TUNNEL}).json()["valid"] is False
+
+
+def test_apps_pass_the_cloudflare_token_to_the_session(client, db, access):
+    make_person(db, "Mama", role="PARENT", email="mama@example.ch")
+    found = client.get("/api/session", headers=outside(token(aud="aud-of-the-apps"))).json()
+    assert found["valid"] is True and found["person"]["name"] == "Mama"
+    assert client.get("/api/session", headers=outside(token("x@example.ch"))).json()["valid"] is False

@@ -1,46 +1,17 @@
 """A forgotten PIN: a reset link by e-mail, or from the NAS as the last resort (spec 2026-10-30 hub hardening, part 3).
-Invented people and addresses."""
+Invented people and addresses. A comment above a test names the review it came from, if any."""
 
 import logging
-import re
+import threading
+import time
 from datetime import timedelta
 
-import pytest
 from fastapi.testclient import TestClient
-from helpers import ADMIN, ADMIN_PIN, APP_HEADER, THROUGH_TUNNEL, login, make_person
+from helpers import ADMIN, ADMIN_PIN, APP_HEADER, RESET_LINK, THROUGH_TUNNEL, device, login, make_person
 
-from app import mailer, models, pin_reset, reset_pin
+from app import links, mailer, models, pin_reset, pins, reset_pin
 from app.main import app
 from app.timeutil import utcnow
-
-# The token after "#": browsers never send that part, so no access log on the way holds it (security review 2026-10-30)
-LINK = re.compile(r"https://home\.local\.example\.ch/reset-pin#token=([A-Za-z0-9_-]+)")
-
-
-class Outbox:
-    def __init__(self, fail=False):
-        self.mails: list[dict] = []
-        self.fail = fail
-
-    def __call__(self, mail_from, to, subject, text, html):
-        if self.fail:
-            raise OSError("mail server down")
-        self.mails.append({"from": mail_from, "to": to, "subject": subject, "text": text, "html": html})
-
-    def token(self, index=-1) -> str:
-        found = LINK.search(self.mails[index]["text"])
-        assert found, self.mails[index]["text"]
-        return found.group(1)
-
-
-@pytest.fixture
-def mail(monkeypatch, configure):
-    configure(RESEND_API_KEY="test")
-    configure(MAIL_FROM="hub@example.org")
-    configure(HUB_PUBLIC_URL="https://home.local.example.ch")
-    outbox = Outbox()
-    monkeypatch.setattr(mailer, "resend_send", outbox)
-    return outbox
 
 
 def with_email(db, name=ADMIN, email="admin@example.org"):
@@ -59,6 +30,14 @@ def ask(client, name=ADMIN):
 
 def confirm(client, token, pin="2468"):
     return client.post("/api/pin-reset/confirm", json={"token": token, "pin": pin})
+
+
+def at_once(count, work):
+    threads = [threading.Thread(target=work) for _ in range(count)]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join()
 
 
 def test_same_answer_for_everyone(client, db, mail, monkeypatch):
@@ -163,7 +142,7 @@ def test_mail_in_person_language(client, db, mail):
 def test_nas_command_prints_a_working_link(client, db, configure, capsys):
     configure(HUB_PUBLIC_URL="https://home.local.example.ch")
     assert reset_pin.main([ADMIN]) == 0
-    found = LINK.search(capsys.readouterr().out)
+    found = RESET_LINK.search(capsys.readouterr().out)
     assert found
     assert confirm(TestClient(app, headers=APP_HEADER), found.group(1)).status_code == 200
     assert reset_pin.main(["Nobody"]) == 1
@@ -201,3 +180,56 @@ def test_no_new_pin_for_someone_inactive(client, db, mail):
     db.commit()
     refused = confirm(client, mail.token())
     assert refused.status_code == 400 and refused.json()["detail"] == "reset_link_invalid"
+
+
+# Security review 2026-10-30, a deferred minor
+# 4. A reset link works once even when it is used twice at the same moment; the hourly limit holds the same way
+def test_a_link_works_once_even_at_the_same_moment(client, db, mail, monkeypatch):
+    with_email(db)
+    ask(client)
+    token = mail.token()
+    real = pins.new_pin
+
+    def slow(person, pin):
+        time.sleep(0.2)
+        real(person, pin)
+
+    monkeypatch.setattr(pins, "new_pin", slow)
+    codes: list[int] = []
+    at_once(2, lambda: codes.append(confirm(device(), token).status_code))
+    assert sorted(codes) == [200, 400]
+
+
+# Security review 2026-10-30, a deferred minor
+def test_three_per_hour_at_the_same_moment(client, db, mail, monkeypatch):
+    with_email(db)
+    real = links.create
+
+    def slow(db_, kind, person, **fields):
+        time.sleep(0.1)
+        return real(db_, kind, person, **fields)
+
+    monkeypatch.setattr(links, "create", slow)
+    at_once(6, lambda: device().post("/api/pin-reset", json={"name": "Admin"}))
+    mailer.flush()
+    assert len(mail.mails) == pin_reset.MAX_PER_HOUR
+
+
+# Security review 2026-10-30, a deferred minor
+# 5. The answer doesn't wait for the mail: how long it takes would tell who has an address
+def test_answer_doesnt_wait_for_the_mail(client, db, mail, monkeypatch):
+    with_email(db)
+    release = threading.Event()
+
+    def slow(*args):
+        release.wait(5)
+        mail(*args)
+
+    monkeypatch.setattr(mailer, "resend_send", slow)
+    start = time.monotonic()
+    response = client.post("/api/pin-reset", json={"name": "Admin"})
+    took = time.monotonic() - start
+    release.set()
+    mailer.flush()
+    assert response.status_code == 200 and took < 1
+    assert len(mail.mails) == 1

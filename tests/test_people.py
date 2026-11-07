@@ -1,8 +1,14 @@
-"""Parents manage the family's people in one place: names, e-mail addresses, PINs, roles. Invented people only."""
+"""Parents manage the family's people in one place: names, e-mail addresses, PINs, roles; each parent only themselves
+and the children. Invented people. A comment above a test names the review it came from, if any."""
 
-from helpers import THROUGH_TUNNEL, add_person, login
+import threading
+import time
 
-from app import models
+from fastapi.testclient import TestClient
+from helpers import own_id, APP_HEADER, add_person, login
+
+from app import models, people_api
+from app.main import app
 
 
 def test_parents_add_and_list(client):
@@ -84,6 +90,58 @@ def test_own_language_and_colour(client):
     assert (me["language"], me["language_chosen"], me["color"]) == ("en", True, "#10b981")
 
 
-def test_managing_people_from_outside_needs_cloudflare(client):
+# Each parent changes only themselves and the children (hub hardening, spec 2026-10-30, part 2)
+
+
+def test_parent_cant_change_another_parent(client):
     login(client)
-    assert client.get("/api/people", headers=THROUGH_TUNNEL).status_code == 401
+    mia = add_person(client, "Mia", role="PARENT")
+    refused = client.patch(f"/api/people/{mia['id']}", json={"color": "#000000"})
+    assert refused.status_code == 403 and refused.json()["detail"] == "other_parent"
+    assert client.put(f"/api/people/{mia['id']}/pin", json={"pin": "9999"}).status_code == 403
+    assert client.patch(f"/api/people/{mia['id']}", json={"active": False}).status_code == 403
+
+
+def test_parent_still_manages_children(client):
+    login(client)
+    lena = add_person(client, "Lena")
+    assert client.patch(f"/api/people/{lena['id']}", json={"name": "Lea"}).status_code == 200
+    assert client.put(f"/api/people/{lena['id']}/pin", json={"pin": "2468"}).status_code == 200
+
+
+def test_parent_changes_themselves(client):
+    login(client)
+    assert client.patch(f"/api/people/{own_id(client)}", json={"color": "#123456"}).status_code == 200
+
+
+def test_own_pin_only_with_the_old_one(client):
+    # A browser left logged in must not be enough to set a parent's own PIN: that goes through /me/pin
+    login(client)
+    refused = client.put(f"/api/people/{own_id(client)}/pin", json={"pin": "9999"})
+    assert refused.status_code == 403 and refused.json()["detail"] == "own_pin_needs_old_pin"
+
+
+def test_last_parent_check_holds_in_parallel(client, monkeypatch):
+    login(client)
+    add_person(client, "Mia", pin="5678", role="PARENT")
+    mia = TestClient(app, headers=APP_HEADER)
+    login(mia, "Mia", "5678")
+    real = people_api._check_last_parent
+
+    def slow(*args):
+        real(*args)
+        # Both would pass the check before either one is saved
+        time.sleep(0.2)
+
+    monkeypatch.setattr(people_api, "_check_last_parent", slow)
+    codes: list[int] = []
+
+    def become_child(who):
+        codes.append(who.patch(f"/api/people/{own_id(who)}", json={"role": "CHILD"}).status_code)
+
+    threads = [threading.Thread(target=become_child, args=(who,)) for who in (client, mia)]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join()
+    assert sorted(codes) == [200, 400]
