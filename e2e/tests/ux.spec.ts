@@ -93,10 +93,21 @@ test('app key format', async ({ page }) => {
 });
 
 // The tab's title follows the language: the browser's before the login, the person's after it
+// Someone of its own: the Admin switching to German would show German to the tests running alongside
 test('tab title per language', async ({ page }) => {
+    const ida = uniqueName('Ida');
     await page.goto('/');
     await expect(page).toHaveTitle('Family');
     await logIn(page, 'Admin', ADMIN_PIN);
+    await page.getByRole('link', { name: 'Settings' }).click();
+    await page.getByRole('button', { name: '+ Add person' }).click();
+    await page.getByLabel('Name', { exact: true }).fill(ida);
+    await page.getByLabel('PIN of the person', { exact: true }).fill('2580');
+    await page.getByRole('button', { name: 'Save person' }).click();
+    await expect(page.getByRole('listitem').filter({ hasText: ida })).toBeVisible();
+    await page.getByRole('button', { name: 'Log out', exact: true }).click();
+    await expect(page.getByRole('heading', { name: 'Who are you?' })).toBeVisible();
+    await logIn(page, ida, '2580');
     await page.getByRole('link', { name: 'Settings' }).click();
     await page.getByLabel('Language').selectOption('de');
     await expect(page).toHaveTitle('Familie');
