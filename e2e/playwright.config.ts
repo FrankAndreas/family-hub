@@ -10,8 +10,10 @@ const data = path.resolve(__dirname, '.tmp');
 
 export default defineConfig({
     testDir: './tests',
-    // One backend and database for all tests
-    workers: 1,
+    // One backend and database for all tests, four at a time: each test makes its own people and apps (uniqueName)
+    // and never changes the Admin, whom they all share
+    workers: 4,
+    fullyParallel: true,
     retries: process.env.CI ? 1 : 0,
     reporter: process.env.CI ? [['list'], ['html', { open: 'never' }]] : 'list',
     use: {
@@ -27,7 +29,7 @@ export default defineConfig({
     ],
     webServer: [
         {
-            command: `rm -rf "${data}" && mkdir -p "${data}" && "${python}" -m uvicorn app.main:app --port 8110`,
+            command: `rm -rf "${data}" && mkdir -p "${data}" && "${python}" ../e2e/serve.py`,
             cwd: path.resolve(__dirname, '..', 'backend'),
             url: `${BACKEND}/health`,
             env: {

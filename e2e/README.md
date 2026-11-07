@@ -2,7 +2,11 @@
 
 Playwright starts its own backend (port 8110, fresh SQLite database and signing key in `e2e/.tmp`, Admin PIN
 `1111`, `DEFAULT_LANGUAGE=en`, `COOKIE_INSECURE=1`) and frontend (port 3110, Vite forwarding `/api` to that backend),
-so dev servers and their data are never touched.
+so dev servers and their data are never touched. The backend runs through `serve.py`, with cheap PIN hashes as in the
+backend tests.
+
+Four tests run at a time against that one backend. So each test makes its own people and apps (`uniqueName`) and
+never changes the Admin they all share (language, PIN, colour): a German Admin would break the tests alongside.
 
 ```bash
 cd e2e
