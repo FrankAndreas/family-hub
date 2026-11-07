@@ -1,10 +1,14 @@
 """Managing the hub needs a cookie only the hub gets (spec 2026-10-30 hub hardening, part 1). Invented people."""
 
+import uuid
+from datetime import datetime, timedelta, timezone
+
+import jwt
 from fastapi.testclient import TestClient
 from helpers import ADMIN_PIN, APP_HEADER, login, make_person
 from test_cloudflare import access, outside, token  # noqa: F401
 
-from app import auth
+from app import auth, keys, models
 from app.main import app
 
 
@@ -55,3 +59,37 @@ def test_outside_can_still_change_own_colour(client, db, access):  # noqa: F811
     make_person(db, "Mama", role="PARENT", email="mama@example.ch")
     response = client.patch("/api/me", json={"color": "#112233"}, headers=outside(token()))
     assert response.status_code == 200
+
+
+# Second checks behind the first ones (tests review 2026-11-07): each refuses on its own, should the first one change
+
+
+def signed(claims: dict) -> str:
+    key, kid = keys.signing_key()
+    full = {"iss": auth.ISSUER, "exp": datetime.now(timezone.utc) + timedelta(minutes=5), **claims}
+    return jwt.encode(full, key, algorithm=auth.ALGORITHM, headers={"kid": kid})
+
+
+def test_manage_cookie_must_name_the_same_person(client, db):
+    lena = make_person(db, "Lena", role="PARENT")
+    admin = models.Person.by_name(db, "Admin")
+    jti = uuid.uuid4().hex
+    session = signed({"typ": "session", "sub": str(admin.id), "ver": admin.token_version, "jti": jti})
+    # Lena's manage token, made for the Admin's very login
+    manage = signed({"typ": "manage", "sub": str(lena.id), "ver": lena.token_version, "sid": jti})
+    client.cookies.set(auth.COOKIE, session)
+    client.cookies.set(auth.MANAGE_COOKIE, manage)
+    assert client.get("/api/me").status_code == 200
+    refused = client.patch("/api/me", json={"color": "#123456"})
+    assert refused.status_code == 403 and refused.json()["detail"] == "login_again"
+
+
+def test_one_kind_of_token_never_counts_as_the_other(db):
+    session, manage = auth.issue_tokens(models.Person.by_name(db, "Admin"))
+    assert auth.token_claims(session, "session") and auth.token_claims(manage, "manage")
+    assert auth.token_claims(manage, "session") is None
+    assert auth.token_claims(session, "manage") is None
+    # A manage token given as the login cookie is no login, even with a made-up id of a login
+    admin = models.Person.by_name(db, "Admin")
+    with_jti = signed({"typ": "manage", "sub": str(admin.id), "ver": admin.token_version, "jti": "x", "sid": "x"})
+    assert auth.person_for_token(db, with_jti) is None

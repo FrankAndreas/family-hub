@@ -165,3 +165,22 @@ test("another parent's app: greyed out once they used it", async ({ page, browse
     await expect(key).toBeDisabled();
     await expect(page.getByText(`${ida} already uses this app, so you can't change its key.`)).toBeVisible();
 });
+
+// A browser without the manage cookie (logged in before it existed, or it got lost) can't manage: the hub says so,
+// and one more login fixes it (tests review 2026-11-07)
+test('log in again when the manage cookie is missing', async ({ page, context }) => {
+    await logIn(page, 'Admin', ADMIN_PIN);
+    await context.clearCookies({ name: 'hub_manage' });
+    // Settings lists people and apps only for someone who may manage them
+    await page.getByRole('link', { name: 'Settings' }).click();
+    const banner = page.getByRole('alert').filter({ has: page.getByRole('link', { name: 'Log in again' }) });
+    await expect(banner).toContainText('Log in again to change this.');
+    await expect(page.getByRole('button', { name: 'Edit Admin' })).toHaveCount(0);
+
+    await banner.getByRole('link', { name: 'Log in again' }).click();
+    await expect(page.getByRole('heading', { name: 'Who are you?' })).toBeVisible();
+    await logIn(page, 'Admin', ADMIN_PIN);
+    await page.getByRole('link', { name: 'Settings' }).click();
+    await expect(page.getByRole('button', { name: 'Edit Admin' })).toBeVisible();
+    await expect(page.getByRole('alert')).toHaveCount(0);
+});

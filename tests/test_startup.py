@@ -1,11 +1,13 @@
 """Startup: settings read and checked, the database brought up to date, a first parent; none of it on import."""
 
+import re
+
 import pytest
 from fastapi.testclient import TestClient
 from pydantic import ValidationError
 from sqlalchemy import inspect
 
-from app import config, database, main, models
+from app import config, database, main, models, pins, seed
 
 
 def test_settings_from_the_environment():
@@ -50,3 +52,24 @@ def test_start_sets_up_a_fresh_database(db):
         # The app's lifespan ran start(): schema migrated, first parent seeded
         assert "alembic_version" in inspect(database.engine).get_table_names()
         assert models.Person.by_name(db, "Admin") is not None
+
+
+def fresh_seed(db):
+    db.query(models.Person).delete()
+    db.commit()
+    return seed.seed_admin(db)
+
+
+def test_first_parent_gets_the_configured_pin(db):
+    assert fresh_seed(db) == "1234"
+    assert seed.seed_admin(db) is None, "people exist: nobody new"
+
+
+@pytest.mark.parametrize("pin", ["12ab", "123", "12345", ""])
+def test_a_wrong_or_missing_admin_pin_becomes_a_random_one(db, configure, caplog, pin):
+    configure(INITIAL_ADMIN_PIN=pin or None)
+    found = fresh_seed(db)
+    # Never the wrong one itself: a PIN of another length can't be typed on the login screen
+    assert found is not None and re.fullmatch(r"\d{4}", found)
+    assert pins.verify_pin(found, models.Person.by_name(db, "Admin").pin_hash)
+    assert ("INITIAL_ADMIN_PIN must be 4 digits" in caplog.text) == bool(pin)
