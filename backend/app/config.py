@@ -6,6 +6,7 @@ import logging
 import os
 from collections.abc import Mapping
 from pathlib import Path
+import re
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, field_validator
@@ -13,6 +14,8 @@ from pydantic import BaseModel, ConfigDict, field_validator
 logger = logging.getLogger(__name__)
 
 Language = Literal["de", "en"]
+# https, or plain http only for a development server on this machine (as an app's address on a tile)
+_PUBLIC_URL = re.compile(r"^(https://[^\s/]+|http://(localhost|127\.0\.0\.1)(:\d+)?)(/\S*)?$")
 
 
 class Settings(BaseModel):
@@ -43,7 +46,7 @@ class Settings(BaseModel):
     @field_validator("hub_public_url")
     @classmethod
     def _an_address(cls, value: str) -> str:
-        if value and not value.startswith(("https://", "http://")):
+        if value and not _PUBLIC_URL.match(value):
             raise ValueError("HUB_PUBLIC_URL must start with https:// (e.g. https://home.local.<domain>)")
         return value.rstrip("/")
 

@@ -28,9 +28,14 @@ def test_settings_from_the_environment():
     assert config.Settings.from_env({"DEFAULT_LANGUAGE": "fr"}).default_language == "de"
 
 
-def test_a_wrong_address_stops_the_start():
+@pytest.mark.parametrize(
+    "address", ["home.local.example.ch", "http://home.local.example.ch", "ftp://home.local.example.ch"]
+)
+def test_a_wrong_address_stops_the_start(address):
+    # The links in mails reset PINs: never over plain http, except a development server on this machine
     with pytest.raises(ValidationError, match="HUB_PUBLIC_URL"):
-        config.Settings.from_env({"HUB_PUBLIC_URL": "home.local.example.ch"})
+        config.Settings.from_env({"HUB_PUBLIC_URL": address})
+    assert config.Settings.from_env({"HUB_PUBLIC_URL": "http://localhost:3110"}).hub_public_url
 
 
 def test_half_a_mail_setup_is_reported(caplog):

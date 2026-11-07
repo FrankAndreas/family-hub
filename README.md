@@ -72,7 +72,7 @@ the app's own `/cdn-cgi/access/logout`, which ends it for every family app (Clou
 half a minute). The hub's `/logout` does the same for anyone who reaches it from outside.
 
 Tell the two kinds of login apart by where the request came from (`Cf-Connecting-Ip`), never by the token's text. A
-request at home with a Cloudflare token as its cookie or Bearer is not logged in; a request from outside without
+request at home with a Cloudflare token (as its cookie, Bearer or `Cf-Access-Jwt-Assertion`) is not logged in; a request from outside without
 `Cf-Access-Jwt-Assertion` neither. A "not logged in" from outside may only be a wrong `CF_AUDIENCE` or Cloudflare's
 keys out of reach: don't cache it, so it ends as soon as that is fixed. A 401 from outside stays on the page with the
 error instead of going to the hub's home address, which is out of reach there (Cloudflare asks for its e-mail code by
