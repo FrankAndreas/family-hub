@@ -59,7 +59,8 @@ def set_address(db: Session, person: models.Person, email: str | None) -> bool:
 
 
 def create_link(db: Session, person: models.Person) -> str:
-    """A confirmation link for the person's pending address: the full address, or the path without HUB_PUBLIC_URL."""
+    """A confirmation link for the person's pending address: the full address, or the path without HUB_PUBLIC_URL.
+    The caller commits."""
     assert person.email_pending is not None
     return links.create(db, KIND, person, email=person.email_pending)
 
@@ -78,7 +79,7 @@ def send_confirmation(db: Session, person: models.Person) -> None:
 
 
 def confirm(db: Session, token: str) -> None:
-    """The address the link was mailed to becomes the person's address."""
+    """The address the link was mailed to becomes the person's address. The caller commits."""
     invalid = api_error(400, "email_link_invalid")
     link = links.claim(db, KIND, token)
     if not isinstance(link, models.EmailConfirm):
@@ -93,4 +94,3 @@ def confirm(db: Session, token: str) -> None:
     person.email_pending = None
     links.end_open(db, KIND, person)
     pin_reset.end_links(db, person)
-    db.commit()

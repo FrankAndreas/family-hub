@@ -35,7 +35,8 @@ def _hash(token: str) -> str:
 
 
 def create(db: Session, kind: Kind, person: models.Person, **fields: str) -> str:
-    """A new link: the full address, or only the path when HUB_PUBLIC_URL is unset. `fields`: the kind's own columns."""
+    """A new link: the full address, or only the path when HUB_PUBLIC_URL is unset. `fields`: the kind's own columns.
+    The caller commits."""
     token = secrets.token_urlsafe(32)
     now = utcnow()
     db.add(
@@ -43,12 +44,13 @@ def create(db: Session, kind: Kind, person: models.Person, **fields: str) -> str
             person_id=person.id, token_hash=_hash(token), created_at=now, expires_at=now + kind.lifetime, **fields
         )
     )
-    db.commit()
-    return f"{config.env('HUB_PUBLIC_URL').rstrip('/')}/{kind.page}#token={token}"
+    db.flush()
+    return f"{config.settings().hub_public_url}/{kind.page}#token={token}"
 
 
 def create_limited(db: Session, kind: Kind, person: models.Person, **fields: str) -> str | None:
-    """A new link, unless the person had `max_per_hour` of this kind in the last hour (None)."""
+    """A new link, unless the person had `max_per_hour` of this kind in the last hour (None). Commits on purpose,
+    under the lock: the next request counts this link."""
     with _limit_lock:
         recent = (
             db.query(kind.model)
@@ -57,12 +59,15 @@ def create_limited(db: Session, kind: Kind, person: models.Person, **fields: str
         )
         if recent >= kind.max_per_hour:
             return None
-        return create(db, kind, person, **fields)
+        link = create(db, kind, person, **fields)
+        db.commit()
+        return link
 
 
 def claim(db: Session, kind: Kind, token: str) -> Link | None:
     """The link this token opens, now used; None if unknown, used or expired. Claimed in one step: of two uses at the
-    same moment, only one finds the link unused (security review 2026-10-30)."""
+    same moment, only one finds the link unused (security review 2026-10-30). Commits on purpose: the link stays used
+    even when what the caller does next fails."""
     now = utcnow()
     claimed = (
         db.query(kind.model)

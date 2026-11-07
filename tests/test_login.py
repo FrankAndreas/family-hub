@@ -11,15 +11,15 @@ def cookie_header(response) -> str:
     return next(v for k, v in response.headers.multi_items() if k == "set-cookie" and v.startswith("hub_session="))
 
 
-def test_login_sets_the_cookie(client, monkeypatch):
-    monkeypatch.setenv("COOKIE_DOMAIN", "local.example.ch")
+def test_login_sets_the_cookie(client, configure):
+    configure(COOKIE_DOMAIN="local.example.ch")
     response = login(client)
     header = cookie_header(response)
     assert "HttpOnly" in header and "SameSite=lax" in header and "Domain=local.example.ch" in header
     assert f"Max-Age={int(timedelta(days=30).total_seconds())}" in header
     # Tests talk plain http (COOKIE_INSECURE=1); on the NAS the cookie is Secure
     assert "Secure" not in header
-    monkeypatch.delenv("COOKIE_INSECURE")
+    configure(COOKIE_INSECURE=None)
     assert "Secure" in cookie_header(login(client))
 
 
@@ -84,7 +84,7 @@ def test_names_for_the_login_screen(client, db):
     assert found == [{"name": "Admin", "color": None}, {"name": "Lena", "color": "#f59e0b"}]
 
 
-def test_config_for_the_login_screen(client, monkeypatch):
+def test_config_for_the_login_screen(client, configure):
     assert client.get("/api/config").json() == {"default_language": "de", "pin_reset": False}
-    monkeypatch.setenv("DEFAULT_LANGUAGE", "en")
+    configure(DEFAULT_LANGUAGE="en")
     assert client.get("/api/config").json()["default_language"] == "en"

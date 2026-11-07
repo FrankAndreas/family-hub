@@ -10,7 +10,7 @@ from fastapi.testclient import TestClient
 from helpers import APP_HEADER, THROUGH_TUNNEL, add_person, login, make_person
 from test_pin_reset import ask, confirm, mail, with_email  # noqa: F401
 
-from app import auth, confirm_email, links, mailer, models, pin_reset
+from app import confirm_email, links, mailer, models, pin_reset, pins
 from app.main import app
 from app.timeutil import utcnow
 
@@ -32,13 +32,13 @@ def test_a_link_works_once_even_at_the_same_moment(client, db, mail, monkeypatch
     with_email(db)
     ask(client)
     token = mail.token()
-    real = auth.new_pin
+    real = pins.new_pin
 
     def slow(person, pin):
         time.sleep(0.2)
         real(person, pin)
 
-    monkeypatch.setattr(auth, "new_pin", slow)
+    monkeypatch.setattr(pins, "new_pin", slow)
     codes: list[int] = []
     at_once(2, lambda: codes.append(confirm(device(), token).status_code))
     assert sorted(codes) == [200, 400]
@@ -141,8 +141,8 @@ def test_confirm_not_through_the_tunnel(client, db, mail):  # noqa: F811
     assert refused.status_code == 403
 
 
-def test_nas_command_prints_a_confirm_link(client, db, monkeypatch, capsys):
-    monkeypatch.setenv("HUB_PUBLIC_URL", "https://home.local.example.ch")
+def test_nas_command_prints_a_confirm_link(client, db, configure, capsys):
+    configure(HUB_PUBLIC_URL="https://home.local.example.ch")
     login(client)
     add_person(client, "Lena", email="lena@example.org")
     assert confirm_email.main(["Lena"]) == 0

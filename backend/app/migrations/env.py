@@ -4,6 +4,7 @@ connection; `alembic` on the command line would use DATABASE_URL like the app.""
 from alembic import context
 from sqlalchemy import create_engine
 
+from app import config as app_config
 from app import database, models
 
 config = context.config
@@ -21,7 +22,7 @@ connection = config.attributes.get("connection")
 if connection is not None:
     run(connection)
 else:
-    engine = create_engine(database.SQLALCHEMY_DATABASE_URL)
+    engine = create_engine(app_config.settings().database_url)
     database.enable_foreign_keys(engine)
     with engine.connect() as conn:
         run(conn)

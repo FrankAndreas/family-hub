@@ -45,7 +45,7 @@ class Person(Base):
     language: Mapped[str | None] = mapped_column(String(2))
     failed_logins: Mapped[int] = mapped_column(default=0)
     locked_until: Mapped[datetime | None]
-    # Locks in a row: each one doubles the next (see auth.lock_duration); a correct login or a new PIN resets it
+    # Locks in a row: each one doubles the next (see pins.lock_duration); a correct login or a new PIN resets it
     lockouts: Mapped[int] = mapped_column(default=0)
     # Part of every login token; raising it ends all of the person's logins (new PIN, log out everywhere)
     token_version: Mapped[int] = mapped_column(default=0)

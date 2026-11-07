@@ -20,6 +20,7 @@ def main(argv: list[str]) -> int:
             return 1
         name = person.name
         link = addresses.create_link(db, person)
+        db.commit()
     print(f"Confirmation link for {name}'s new e-mail address, valid for 24 hours, at home only:\n{link}")
     if link.startswith("/"):
         print("(HUB_PUBLIC_URL is not set: open this path on the hub's address, e.g. https://home.local.<domain>)")
