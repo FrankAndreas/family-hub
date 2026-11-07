@@ -7,7 +7,8 @@ same stack and look. German by default, English per person.
 - **People in one place**: name, e-mail address, PIN, parent or child, colour. Parents add family members and set PINs
   here only; each app keeps just its own details about a person.
 - **At home** (`*.local.<domain>`): pick your name, type your PIN. The login cookie is set for `local.<domain>`, so
-  every app at home gets it, for 30 days. Switching apps never asks again; logging out logs out of all apps.
+  every app at home gets it. Switching apps never asks again; logging out logs out of all apps. A login lasts while
+  it is used: opening the hub renews it for 30 days, so only a month without opening the hub ends it.
 - **From outside** (`*.<domain>` through the Cloudflare Tunnel): Cloudflare Access is the login (e-mail code or
   Google). The hub and the apps know the person by e-mail address. There is no PIN login outside, and the home cookie
   counts for nothing there.
@@ -58,7 +59,9 @@ access, 404 for an unknown key. The app keeps its own copy keyed by `id`, refres
 who left the list instead of deleting their data. Logging out everywhere, a new PIN and deactivating a
 person all end a login. The app keeps its own data per person under the hub's `person.id`.
 
-The hub's tokens are EdDSA JWTs (`iss` `family-hub`, `sub` the person's id). An app may also check their signature
+The hub's tokens are EdDSA JWTs (`iss` `family-hub`, `sub` the person's id). The hub renews a login in use by
+setting the cookie again with a later `exp` (same `jti`), so an app reads the cookie on every request rather than
+keeping a copy. An app may also check their signature
 itself with the public key at `<hub>/.well-known/jwks.json`; asking `/api/session` is still what honours a logout.
 
 Apps only read from the hub. Every change (POST, PUT, PATCH, DELETE) needs the header `X-Requested-With: hub`, which

@@ -13,8 +13,9 @@ router = APIRouter(tags=["login"])
 
 @router.get("/config")
 def public_config():
-    """What the login screen needs before anyone is logged in: the language for browsers that speak neither."""
-    return {"default_language": config.default_language(), "pin_reset": mailer.is_configured()}
+    """What the pages need before anyone is logged in: the language for browsers that speak neither, and whether the hub
+    sends mails (a forgotten PIN, confirming an address)."""
+    return {"default_language": config.default_language(), "mails": mailer.is_configured()}
 
 
 @router.get("/people/public", response_model=list[schemas.PersonPublic], dependencies=[Depends(auth.require_home)])
@@ -54,7 +55,9 @@ def logout_everywhere(
 
 
 @router.get("/me", response_model=schemas.PersonOut)
-def me(request: Request, person: models.Person = Depends(auth.current_person)):
+def me(request: Request, response: Response, person: models.Person = Depends(auth.current_person)):
+    """Who is logged in. The hub's page asks this whenever it opens, so here a login in use is renewed."""
+    auth.renew(request, response, person)
     return schemas.PersonOut.of(person, not auth.through_tunnel(request))
 
 

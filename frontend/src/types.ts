@@ -1,3 +1,6 @@
+import type { Language } from './i18n';
+
+export type { Language };
 export type Role = 'PARENT' | 'CHILD';
 
 export interface Person {
@@ -9,7 +12,7 @@ export interface Person {
     role: Role;
     active: boolean;
     color: string | null;
-    language: 'de' | 'en';
+    language: Language;
     language_chosen: boolean;
     // Managing people, PINs and apps happens at home only
     at_home: boolean;

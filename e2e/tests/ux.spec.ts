@@ -122,3 +122,23 @@ test('reset link without a token', async ({ page }) => {
     await expect(page.getByLabel('New PIN', { exact: true })).toHaveCount(0);
     await expect(page.getByRole('link', { name: 'To the login' })).toBeVisible();
 });
+
+// A parent sets a child's language; the child sees the hub in it (functional review 2026-11-07)
+test("a child's language set by a parent", async ({ page }) => {
+    const kid = uniqueName('Kid');
+    await logIn(page, 'Admin', ADMIN_PIN);
+    await page.getByRole('link', { name: 'Settings' }).click();
+    await page.getByRole('button', { name: '+ Add person' }).click();
+    await page.getByLabel('Name', { exact: true }).fill(kid);
+    await page.getByLabel('PIN of the person', { exact: true }).fill('3690');
+    await expect(page.getByRole('combobox', { name: 'Language' }).last()).toHaveValue('');
+    await page.getByRole('combobox', { name: 'Language' }).last().selectOption('de');
+    await page.getByRole('button', { name: 'Save person' }).click();
+    await expect(page.getByRole('listitem').filter({ hasText: kid })).toBeVisible();
+    await page.getByRole('button', { name: 'Log out', exact: true }).click();
+    await expect(page.getByRole('heading', { name: 'Who are you?' })).toBeVisible();
+
+    await page.getByRole('button', { name: kid, exact: true }).click();
+    await page.getByLabel('PIN', { exact: true }).fill('3690');
+    await expect(page.getByRole('heading', { name: `Hallo ${kid}` })).toBeVisible();
+});

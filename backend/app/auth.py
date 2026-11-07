@@ -24,6 +24,9 @@ MANAGE_COOKIE = "hub_manage"
 ISSUER = "family-hub"
 ALGORITHM = "EdDSA"
 TOKEN_LIFETIME = timedelta(days=30)
+# A login in use doesn't run out (the user's choice, functional review 2026-11-07): once a day old, the hub's pages
+# renew it for TOKEN_LIFETIME from then, so only a month without opening the hub ends it
+RENEW_AFTER = timedelta(days=1)
 # The hub's own pages send it with every change; another page on the family's domain can't make a browser send it
 APP_HEADER = "x-requested-with"
 APP_HEADER_VALUE = "hub"
@@ -42,9 +45,10 @@ def require_app_header(request: Request) -> None:
         raise api_error(status.HTTP_403_FORBIDDEN, "csrf")
 
 
-def issue_tokens(person: models.Person) -> tuple[str, str]:
+def issue_tokens(person: models.Person, jti: str | None = None) -> tuple[str, str]:
     """A login: the session token every app at home gets, and the manage token only the hub gets (spec 2026-10-30 hub
-    hardening). The session's id (jti) lets "Log out" end exactly this login; the manage token names it (sid)."""
+    hardening). The session's id (jti) lets "Log out" end exactly this login; the manage token names it (sid). A
+    renewed login keeps its jti."""
     key, kid = keys.signing_key()
     common = {
         "iss": ISSUER,
@@ -52,7 +56,7 @@ def issue_tokens(person: models.Person) -> tuple[str, str]:
         "ver": person.token_version,
         "exp": datetime.now(timezone.utc) + TOKEN_LIFETIME,
     }
-    jti = uuid.uuid4().hex
+    jti = jti or uuid.uuid4().hex
     session = jwt.encode({**common, "typ": "session", "jti": jti}, key, algorithm=ALGORITHM, headers={"kid": kid})
     manage = jwt.encode({**common, "typ": "manage", "sid": jti}, key, algorithm=ALGORITHM, headers={"kid": kid})
     return session, manage
@@ -106,28 +110,57 @@ def end_login(db: Session, token: str | None) -> None:
         db.add(models.EndedLogin(jti=jti, expires_at=expires))
 
 
-def set_cookies(response: Response, session: str, manage: str) -> None:
-    """The session cookie for every app at home (COOKIE_DOMAIN); the manage cookie for the hub alone (no domain)."""
+def _set_session_cookie(response: Response, session: str) -> None:
+    """For every app at home (COOKIE_DOMAIN)."""
     settings = config.settings()
-    max_age = int(TOKEN_LIFETIME.total_seconds())
     response.set_cookie(
         COOKIE,
         session,
-        max_age=max_age,
+        max_age=int(TOKEN_LIFETIME.total_seconds()),
         domain=settings.cookie_domain,
         secure=settings.cookie_secure,
         httponly=True,
         samesite="lax",
     )
+
+
+def _set_manage_cookie(response: Response, manage: str) -> None:
+    """For the hub alone (no domain, only /api)."""
     response.set_cookie(
         MANAGE_COOKIE,
         manage,
-        max_age=max_age,
+        max_age=int(TOKEN_LIFETIME.total_seconds()),
         path="/api",
-        secure=settings.cookie_secure,
+        secure=config.settings().cookie_secure,
         httponly=True,
         samesite="strict",
     )
+
+
+def set_cookies(response: Response, session: str, manage: str) -> None:
+    _set_session_cookie(response, session)
+    _set_manage_cookie(response, manage)
+
+
+def renew(request: Request, response: Response, person: models.Person) -> None:
+    """At home, a login at least RENEW_AFTER old gets its cookies again, valid for TOKEN_LIFETIME from now. It stays the
+    same login (same jti), so "Log out" ends it with every older copy. The manage cookie is renewed only when it
+    belongs to this very login; without one the person still logs in again to manage. `person`: whom the session
+    cookie names, checked by current_person (not ended, not logged out everywhere, active)."""
+    if through_tunnel(request):
+        return
+    session = token_claims(request.cookies.get(COOKIE), "session")
+    exp = session.get("exp") if session else None
+    if session is None or not isinstance(exp, int):
+        return
+    if datetime.fromtimestamp(exp, timezone.utc) - datetime.now(timezone.utc) > TOKEN_LIFETIME - RENEW_AFTER:
+        return
+    jti = session["jti"]
+    new_session, new_manage = issue_tokens(person, jti)
+    _set_session_cookie(response, new_session)
+    manage = token_claims(request.cookies.get(MANAGE_COOKIE), "manage")
+    if manage is not None and manage.get("sid") == jti and manage.get("sub") == session.get("sub"):
+        _set_manage_cookie(response, new_manage)
 
 
 def clear_cookies(response: Response) -> None:

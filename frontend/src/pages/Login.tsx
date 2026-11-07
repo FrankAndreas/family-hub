@@ -37,7 +37,7 @@ export default function Login() {
                 if (axios.isAxiosError(err) && err.response?.status === 403 && err.response.data?.detail === 'login_at_home_only') setOutside(true);
                 else setLoadError(errorMessage(err));
             });
-        api.get<{ pin_reset: boolean }>('/api/config').then(res => setCanReset(res.data.pin_reset)).catch(() => undefined);
+        api.get<{ mails: boolean }>('/api/config').then(res => setCanReset(res.data.mails)).catch(() => undefined);
     }, []);
     useEffect(loadNames, [loadNames]);
 

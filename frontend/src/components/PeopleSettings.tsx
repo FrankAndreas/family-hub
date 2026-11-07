@@ -2,21 +2,23 @@ import { useState, type FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import api from '../api';
 import { useAuth } from '../AuthContext';
-import type { Person, Role } from '../types';
+import type { Language, Person, Role } from '../types';
 import { BUTTON, BUTTON_SECONDARY, CARD, ERROR, INPUT, TOUCH } from '../ui';
-import { useAction } from '../useApi';
+import { useAction, useResource } from '../useApi';
 import PinInput from './PinInput';
 import { useFormFocus } from './useFormFocus';
 
 interface Form {
     id: number | null; name: string; email: string; role: Role; color: string; active: boolean; pin: string;
+    // Empty: the hub's default language
+    language: Language | '';
     // Editing oneself: the address as it was, and the own PIN needed to change it
     oldEmail: string; currentPin: string;
     // The role as saved (a new person: none)
     oldRole: Role | null;
 }
 
-const empty: Form = { id: null, name: '', email: '', role: 'CHILD', color: '#64748b', active: true, pin: '', oldEmail: '', currentPin: '', oldRole: null };
+const empty: Form = { id: null, name: '', email: '', role: 'CHILD', color: '#64748b', active: true, pin: '', language: '', oldEmail: '', currentPin: '', oldRole: null };
 
 // Parents: the family's people, in one place for every app (name, e-mail for Cloudflare, role, colour, PIN). The list
 // comes from the settings page, which shares it with the apps' section
@@ -26,6 +28,8 @@ export default function PeopleSettings({ people, loadError, reload }: { people: 
     const [form, setForm] = useState<Form | null>(null);
     const { run, error } = useAction(reload);
     const formRef = useFormFocus(form ? String(form.id) : null);
+    // Whether the hub mails confirmation links, and its default language
+    const { data: config } = useResource<{ mails: boolean; default_language: Language }>('/api/config');
 
     const save = async (e: FormEvent) => {
         e.preventDefault();
@@ -33,7 +37,7 @@ export default function PeopleSettings({ people, loadError, reload }: { people: 
         // Someone else made a parent is another parent from then on: only they change their details, PIN and role
         const newParent = form.role === 'PARENT' && form.oldRole !== 'PARENT' && form.id !== me?.id;
         if (newParent && !confirm(t('people.confirmParent', { name: form.name }))) return;
-        const body = { name: form.name, email: form.email.trim() || null, role: form.role, color: form.color };
+        const body = { name: form.name, email: form.email.trim() || null, role: form.role, color: form.color, language: form.language || null };
         await run(async () => {
             if (form.id === null) {
                 await api.post('/api/people', { ...body, pin: form.pin });
@@ -48,7 +52,7 @@ export default function PeopleSettings({ people, loadError, reload }: { people: 
     };
 
     const edit = (p: Person) =>
-        setForm({ id: p.id, name: p.name, email: p.email_pending ?? p.email ?? '', role: p.role, color: p.color ?? '#64748b', active: p.active, pin: '', oldEmail: p.email_pending ?? p.email ?? '', currentPin: '', oldRole: p.role });
+        setForm({ id: p.id, name: p.name, email: p.email_pending ?? p.email ?? '', role: p.role, color: p.color ?? '#64748b', active: p.active, pin: '', language: p.language_chosen ? p.language : '', oldEmail: p.email_pending ?? p.email ?? '', currentPin: '', oldRole: p.role });
     const editingSelf = form !== null && form.id !== null && form.id === me?.id;
     const emailChanged = editingSelf && form.email.trim() !== form.oldEmail;
     // A new address waits for the link mailed to it (backend addresses.py)
@@ -73,12 +77,19 @@ export default function PeopleSettings({ people, loadError, reload }: { people: 
                             <input className={INPUT} type="email" value={form.email} maxLength={254} aria-describedby={newEmail ? 'email-hint' : undefined}
                                 onChange={e => setForm({ ...form, email: e.target.value })} />
                         </label>
-                        {newEmail && <p id="email-hint" className="mt-1 text-xs">{t('people.emailHint')}</p>}
+                        {newEmail && <p id="email-hint" className="mt-1 text-xs">{t(config?.mails === false ? 'people.emailHintNoMail' : 'people.emailHint')}</p>}
                     </div>
                     <label className="text-sm text-slate-400">{t('people.role')}
                         <select className={INPUT} value={form.role} onChange={e => setForm({ ...form, role: e.target.value as Role })}>
                             <option value="PARENT">{t('people.roles.PARENT')}</option>
                             <option value="CHILD">{t('people.roles.CHILD')}</option>
+                        </select>
+                    </label>
+                    <label className="text-sm text-slate-400">{t('people.language')}
+                        <select className={INPUT} value={form.language} onChange={e => setForm({ ...form, language: e.target.value as Language | '' })}>
+                            <option value="">{t('people.languageDefault', { language: t(`languages.${config?.default_language ?? 'de'}`) })}</option>
+                            <option value="de">{t('languages.de')}</option>
+                            <option value="en">{t('languages.en')}</option>
                         </select>
                     </label>
                     <label className="text-sm text-slate-400">{t('people.color')}
