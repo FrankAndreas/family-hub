@@ -1,23 +1,20 @@
-import { useCallback, useEffect, useState, type FormEvent } from 'react';
+import { useState, type FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
-import api, { errorMessage } from '../api';
+import api from '../api';
 import { useAuth } from '../AuthContext';
 import PeopleSettings from '../components/PeopleSettings';
 import PinInput from '../components/PinInput';
 import TilesSettings from '../components/TilesSettings';
 import type { Person } from '../types';
 import { BUTTON, BUTTON_DANGER, CARD, ERROR, INPUT } from '../ui';
+import { useAction, useResource } from '../useApi';
 
 // Parents: one list of people for both sections, so a person just added can be ticked for an app right away
 function Manage() {
-    const [people, setPeople] = useState<Person[]>([]);
-    const [error, setError] = useState('');
-    const load = useCallback(() => {
-        api.get<Person[]>('/api/people').then(res => { setPeople(res.data); setError(''); }).catch(err => setError(errorMessage(err)));
-    }, []);
-    useEffect(load, [load]);
+    const { data, error, reload } = useResource<Person[]>('/api/people');
+    const people = data ?? [];
     return (<>
-        <PeopleSettings people={people} loadError={error} reload={load} />
+        <PeopleSettings people={people} loadError={error} reload={reload} />
         <TilesSettings people={people} />
     </>);
 }
@@ -30,55 +27,41 @@ export default function Settings() {
     const [newPin, setNewPin] = useState('');
     const [againPin, setAgainPin] = useState('');
     const [message, setMessage] = useState('');
-    const [error, setError] = useState('');
+    const pinChange = useAction();
     // Language and "log out everywhere"
-    const [otherError, setOtherError] = useState('');
+    const other = useAction();
 
     // Typing again clears the last outcome ("PIN changed" or an error), so it never stays next to new input. No timer:
     // a message that goes away by itself may be gone before someone has read it
     const typed = (set: (pin: string) => void) => (pin: string) => {
         set(pin);
         setMessage('');
-        setError('');
+        pinChange.setError('');
     };
 
     const changePin = async (e: FormEvent) => {
         e.preventDefault();
+        setMessage('');
         if (newPin !== againPin) {
-            setMessage('');
-            setError(t('reset.mismatch'));
+            pinChange.setError(t('reset.mismatch'));
             return;
         }
-        try {
-            await api.put('/api/me/pin', { old_pin: oldPin, pin: newPin });
+        if (await pinChange.run(() => api.put('/api/me/pin', { old_pin: oldPin, pin: newPin }))) {
             setOldPin('');
             setNewPin('');
             setAgainPin('');
-            setError('');
             setMessage(t('settings.pinChanged'));
-        } catch (err) {
-            setMessage('');
-            setError(errorMessage(err));
         }
     };
 
-    const other = async (request: () => Promise<unknown>) => {
-        try {
-            await request();
-            setOtherError('');
-        } catch (err) {
-            setOtherError(errorMessage(err));
-        }
-    };
-
-    const setLanguage = (language: string) => other(async () => {
+    const setLanguage = (language: string) => other.run(async () => {
         await api.patch('/api/me', { language });
         await reload();
     });
 
     const logoutEverywhere = async () => {
         if (!confirm(t('settings.confirmEverywhere'))) return;
-        await other(async () => {
+        await other.run(async () => {
             await api.post('/api/logout-everywhere');
             await reload();
         });
@@ -110,7 +93,7 @@ export default function Settings() {
                     </button>
                 </form>
                 {message && <p role="status" className="text-sm text-emerald-300">{message}</p>}
-                {error && <p role="alert" className={ERROR}>{error}</p>}
+                {pinChange.error && <p role="alert" className={ERROR}>{pinChange.error}</p>}
             </section>}
             <section className={`${CARD} space-y-3`}>
                 <div className="flex flex-wrap items-end gap-4">
@@ -122,7 +105,7 @@ export default function Settings() {
                     </label>
                     <button type="button" className={BUTTON_DANGER} onClick={() => void logoutEverywhere()}>{t('settings.logoutEverywhere')}</button>
                 </div>
-                {otherError && <p role="alert" className={ERROR}>{otherError}</p>}
+                {other.error && <p role="alert" className={ERROR}>{other.error}</p>}
             </section>
             {atHome && person?.role === 'PARENT' && <Manage />}
         </div>

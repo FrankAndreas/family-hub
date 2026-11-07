@@ -1,8 +1,9 @@
-import { useCallback, useEffect, useState, type FormEvent } from 'react';
+import { useState, type FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
-import api, { errorMessage } from '../api';
+import api from '../api';
 import type { Person, TileFull } from '../types';
 import { BUTTON, BUTTON_SECONDARY, CARD, ERROR, INPUT, TOUCH } from '../ui';
+import { useAction, useResource } from '../useApi';
 import { useFormFocus } from './useFormFocus';
 
 interface Form {
@@ -23,29 +24,17 @@ const empty: Form = {
 // so someone just added in the people's section can be ticked here right away
 export default function TilesSettings({ people }: { people: Person[] }) {
     const { t, i18n } = useTranslation();
-    const [tiles, setTiles] = useState<TileFull[]>([]);
+    const loaded = useResource<TileFull[]>('/api/tiles/manage');
+    const tiles = loaded.data ?? [];
+    const { run: call, error: callError } = useAction(loaded.reload);
+    // A failed change, else a failed load
+    const error = callError || loaded.error;
     const [form, setForm] = useState<Form | null>(null);
-    const [error, setError] = useState('');
     const formRef = useFormFocus(form ? String(form.id) : null);
-
-    const load = useCallback(() => {
-        api.get<TileFull[]>('/api/tiles/manage').then(res => setTiles(res.data)).catch(err => setError(errorMessage(err)));
-    }, []);
-    useEffect(load, [load]);
 
     const names = (ids: number[]) => people.filter(p => ids.includes(p.id)).map(p => p.name).join(', ');
     const keyLocked = form !== null && form.protected.length > 0;
     const date = (iso: string) => new Date(iso).toLocaleDateString(i18n.language, { dateStyle: 'medium' });
-
-    const call = async (request: () => Promise<unknown>) => {
-        try {
-            await request();
-            setError('');
-            load();
-        } catch (err) {
-            setError(errorMessage(err));
-        }
-    };
 
     const save = (e: FormEvent) => {
         e.preventDefault();

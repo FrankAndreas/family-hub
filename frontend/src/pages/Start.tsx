@@ -1,20 +1,14 @@
-import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import api, { errorMessage } from '../api';
 import { useAuth } from '../AuthContext';
 import type { Tile } from '../types';
 import { ERROR } from '../ui';
+import { useResource } from '../useApi';
 
 // The start page: a tile per app, opening the app itself (at home its home address, outside its outside one)
 export default function Start() {
     const { t } = useTranslation();
     const { person } = useAuth();
-    const [tiles, setTiles] = useState<Tile[] | null>(null);
-    const [error, setError] = useState('');
-
-    useEffect(() => {
-        api.get<Tile[]>('/api/tiles').then(res => setTiles(res.data)).catch(err => setError(errorMessage(err)));
-    }, []);
+    const { data: tiles, error } = useResource<Tile[]>('/api/tiles');
 
     return (
         <>
