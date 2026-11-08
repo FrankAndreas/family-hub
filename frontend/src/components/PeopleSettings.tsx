@@ -134,6 +134,7 @@ export default function PeopleSettings({ people, loadError, reload }: { people: 
                     <li key={p.id} className="flex flex-wrap items-center gap-2 py-2">
                         <span aria-hidden="true" className="h-3 w-3 rounded-full" style={{ background: p.color ?? '#64748b' }} />
                         <span className={`min-w-0 break-words font-medium ${p.active ? '' : 'text-slate-400 line-through'}`}>{p.name}</span>
+                        {!p.active && <span className="rounded border border-slate-500 px-1.5 text-xs text-slate-300">{t('people.inactive')}</span>}
                         <span className="text-sm text-slate-400">{t(`people.roles.${p.role}`)}</span>
                         {p.email && <span className="min-w-0 break-all text-sm text-slate-400">{p.email}</span>}
                         {p.email_pending && (

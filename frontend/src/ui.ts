@@ -1,6 +1,7 @@
 // Shared Tailwind classes, so forms and cards look the same everywhere (Aurora theme, see index.css)
+// slate-500: a field's outline reaches 3:1 on the cards (WCAG for controls; white/10 gave 1.4:1)
 export const FIELD =
-    'rounded-lg border border-white/10 bg-slate-900/60 p-2 text-slate-100 focus:border-cyan-400 focus:outline-none';
+    'rounded-lg border border-slate-500 bg-slate-900/60 p-2 text-slate-100 focus:border-cyan-400 focus:outline-none';
 export const INPUT = `${FIELD} w-full`;
 export const BUTTON = 'btn-primary';
 export const BUTTON_SECONDARY =

@@ -2,11 +2,13 @@ import { useState, type FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import api, { errorMessage } from '../api';
 import PinInput from '../components/PinInput';
+import { usePageTitle } from '../pageTitle';
 import { BUTTON, CARD, ERROR } from '../ui';
 
 // The link from the "Forgot PIN" mail (or the NAS command): a new PIN, then the login
 export default function ResetPin() {
     const { t } = useTranslation();
+    usePageTitle(t('reset.title'));
     // After "#": the token never reaches a server or its access log (security review 2026-10-30)
     const [token] = useState(() => new URLSearchParams(window.location.hash.slice(1)).get('token') ?? '');
     const [pin, setPin] = useState('');
@@ -29,7 +31,7 @@ export default function ResetPin() {
     };
 
     return (
-        <div className="mx-auto max-w-md px-4 py-10">
+        <main className="mx-auto max-w-md px-4 py-10">
             <div className={`${CARD} space-y-4`}>
                 <h1 className="text-xl font-semibold">{t('reset.title')}</h1>
                 {!token ? (
@@ -55,6 +57,6 @@ export default function ResetPin() {
                     </form>
                 )}
             </div>
-        </div>
+        </main>
     );
 }

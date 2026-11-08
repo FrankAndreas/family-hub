@@ -1,6 +1,6 @@
-import { type ReactNode } from 'react';
+import { useEffect, useRef, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Link, NavLink } from 'react-router-dom';
+import { Link, NavLink, useLocation } from 'react-router-dom';
 import { useAuth } from '../AuthContext';
 import { BUTTON_SECONDARY, TOUCH } from '../ui';
 import LoginAgain from './LoginAgain';
@@ -14,10 +14,23 @@ const navClass = ({ isActive }: { isActive: boolean }) =>
 export default function Layout({ children }: { children: ReactNode }) {
     const { t } = useTranslation();
     const { person, logout } = useAuth();
+    const main = useRef<HTMLElement>(null);
+    const { pathname } = useLocation();
+    const shown = useRef(pathname);
+    // Moving to another page puts the focus on its heading: a screen reader reads where one is now, and Tab goes on
+    // from there. Not on the first page shown (the login form or the browser keeps theirs)
+    useEffect(() => {
+        if (shown.current === pathname) return;
+        shown.current = pathname;
+        const heading = main.current?.querySelector('h1');
+        if (!heading) return;
+        heading.tabIndex = -1;
+        heading.focus();
+    }, [pathname]);
     return (
         <div className="mx-auto max-w-5xl px-4 py-4">
             <header className="mb-6 flex flex-wrap items-center gap-3">
-                <Link to="/" className="mr-auto text-xl font-semibold text-slate-100">🏠 {t('app.title')}</Link>
+                <Link to="/" className="mr-auto text-xl font-semibold text-slate-100"><span aria-hidden="true">🏠 </span>{t('app.title')}</Link>
                 <nav className="flex flex-wrap items-center gap-3 text-sm">
                     <NavLink to="/" end className={navClass}>{t('nav.start')}</NavLink>
                     <NavLink to="/settings" className={navClass}>{t('nav.settings')}</NavLink>
@@ -33,7 +46,7 @@ export default function Layout({ children }: { children: ReactNode }) {
                 </nav>
             </header>
             <LoginAgain />
-            <main>{children}</main>
+            <main ref={main}>{children}</main>
         </div>
     );
 }
