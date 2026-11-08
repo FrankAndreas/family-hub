@@ -233,3 +233,27 @@ def test_answer_doesnt_wait_for_the_mail(client, db, mail, monkeypatch):
     mailer.flush()
     assert response.status_code == 200 and took < 1
     assert len(mail.mails) == 1
+
+
+# Privacy review 2026-11-07: an hour after they expired, links are deleted; an address confirmation holds the address it
+# went to, which mustn't stay for years. A link still counting towards the limit per hour stays
+def test_expired_links_are_dropped(db):
+    lena = make_person(db, "Lena", email="lena@example.ch")
+    now = utcnow()
+    for created in (now - timedelta(days=400), now - timedelta(minutes=80), now - timedelta(minutes=10)):
+        db.add(
+            models.EmailConfirm(
+                person_id=lena.id,
+                email="old@example.ch",
+                token_hash=f"{created:%j%H%M}".ljust(64, "0"),
+                created_at=created,
+                expires_at=created + timedelta(minutes=30),
+            )
+        )
+    db.add(models.PinReset(person_id=lena.id, token_hash="f" * 64, created_at=now, expires_at=now - timedelta(hours=2)))
+    db.commit()
+    links.create(db, pin_reset.KIND, lena)
+    db.commit()
+    kept = sorted(link.created_at for link in db.query(models.EmailConfirm))
+    assert kept == [now - timedelta(minutes=80), now - timedelta(minutes=10)]
+    assert db.query(models.PinReset).count() == 1

@@ -1,6 +1,7 @@
 """One-time links for a person: a forgotten PIN (pin_reset) or a new e-mail address (addresses), mailed or printed on
 the NAS. Only the token's SHA-256 is kept, and the token sits after "#", which browsers never send, so no access log
-holds it. A link works once, until it expires; at most a few are made per person and hour."""
+holds it. A link works once, until it expires; at most a few are made per person and hour. An hour after it expired a
+link is deleted (drop_expired): an address confirmation holds the address it went to, which mustn't stay for years."""
 
 import hashlib
 import secrets
@@ -34,9 +35,21 @@ def _hash(token: str) -> str:
     return hashlib.sha256(token.encode()).hexdigest()
 
 
+# Kept this long after expiring: a link counts towards the limit per hour for an hour after it was made
+KEEP_EXPIRED = timedelta(hours=1)
+
+
+def drop_expired(db: Session) -> None:
+    """Deletes the links of every kind that expired more than KEEP_EXPIRED ago, used or not (privacy review
+    2026-11-07). The caller commits."""
+    for model in (models.PinReset, models.EmailConfirm):
+        db.query(model).filter(model.expires_at < utcnow() - KEEP_EXPIRED).delete(synchronize_session=False)
+
+
 def create(db: Session, kind: Kind, person: models.Person, **fields: str) -> str:
     """A new link: the full address, or only the path when HUB_PUBLIC_URL is unset. `fields`: the kind's own columns.
-    The caller commits."""
+    Old links go first (drop_expired). The caller commits."""
+    drop_expired(db)
     token = secrets.token_urlsafe(32)
     now = utcnow()
     db.add(

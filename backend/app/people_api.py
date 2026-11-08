@@ -134,6 +134,21 @@ def change_person(
     return schemas.PersonOut.of(person)
 
 
+@router.delete("/people/{person_id}")
+def delete_person(person_id: int, actor: models.Person = Depends(auth.require_parent), db: Session = Depends(get_db)):
+    """Someone who left the family for good, gone from the hub with their PIN, address, devices, links and app access
+    (privacy review 2026-11-07); their name and address are free again. Only once inactive, so the logins already
+    ended and a slip of the finger can't remove someone in use. Never another parent. Each app keeps what it holds about
+    the person (hidden, as for someone inactive) until it's deleted there."""
+    person = _get(db, person_id)
+    _not_another_parent(actor, person)
+    if person.active:
+        raise api_error(409, "person_active")
+    db.delete(person)
+    db.commit()
+    return {"deleted": person_id}
+
+
 @router.put("/people/{person_id}/pin")
 def set_pin(
     person_id: int,

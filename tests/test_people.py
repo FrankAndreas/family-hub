@@ -5,9 +5,9 @@ import threading
 import time
 
 from fastapi.testclient import TestClient
-from helpers import own_id, APP_HEADER, add_person, login
+from helpers import own_id, APP_HEADER, add_person, budget_tile, login
 
-from app import models, people_api
+from app import links, models, people_api, pin_reset
 from app.main import app
 
 
@@ -145,3 +145,49 @@ def test_last_parent_check_holds_in_parallel(client, monkeypatch):
     for thread in threads:
         thread.join()
     assert sorted(codes) == [200, 400]
+
+
+# Privacy review 2026-11-07: someone who left the family for good can be removed, with everything the hub kept about
+# them; their name and address are free again. Only once inactive, and never another parent
+def test_delete_someone_who_left(client, db):
+    login(client)
+    lena = add_person(client, "Lena", email="lena@example.ch")
+    person = db.get(models.Person, lena["id"])
+    person.email, person.email_pending = person.email_pending, None
+    tile = budget_tile(db, person)
+    db.commit()
+    login(client, "Lena", "5678")
+    links.create(db, pin_reset.KIND, person)
+    db.commit()
+    login(client)
+
+    refused = client.delete(f"/api/people/{lena['id']}")
+    assert refused.status_code == 409 and refused.json()["detail"] == "person_active"
+    client.patch(f"/api/people/{lena['id']}", json={"active": False})
+    assert client.delete(f"/api/people/{lena['id']}").json() == {"deleted": lena["id"]}
+
+    db.expire_all()
+    assert db.get(models.Person, lena["id"]) is None
+    for table in (models.KnownDevice, models.PinReset, models.EmailConfirm):
+        assert db.query(table).filter_by(person_id=lena["id"]).count() == 0, table
+    assert db.get(models.Tile, tile.id).people == []
+    assert [p["name"] for p in client.get("/api/people").json()] == ["Admin"]
+    # A new Lena is someone else to the apps: a deleted person's id never comes back (AUTOINCREMENT)
+    assert add_person(client, "Lena", email="lena@example.ch")["id"] > lena["id"]
+    assert client.delete(f"/api/people/{lena['id']}").status_code == 404
+
+
+def test_delete_only_who_one_may_change(client):
+    login(client)
+    mia = add_person(client, "Mia", role="PARENT")
+    refused = client.delete(f"/api/people/{mia['id']}")
+    assert refused.status_code == 403 and refused.json()["detail"] == "other_parent"
+    tim = add_person(client, "Tim")
+    client.patch(f"/api/people/{tim['id']}", json={"active": False})
+    client.post("/api/logout")
+    login(client, "Mia", "5678")
+    # Mia manages the children too; a child manages no one
+    add_person(client, "Ben")
+    client.post("/api/logout")
+    login(client, "Ben", "5678")
+    assert client.delete(f"/api/people/{tim['id']}").status_code == 403

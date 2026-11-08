@@ -107,3 +107,26 @@ test('the AUD tag of an app', async ({ page }) => {
     await page.getByRole('button', { name: `Edit ${app}` }).click();
     await expect(page.getByLabel("Cloudflare Access: the AUD tag of this app's application")).toHaveValue(tag);
 });
+
+// Privacy review 2026-11-07: someone who left for good is deleted once inactive, and their name is free again
+test('delete someone who left', async ({ page }) => {
+    const kid = uniqueName('Gone');
+    await logIn(page, 'Admin', ADMIN_PIN);
+    await page.getByRole('link', { name: 'Settings' }).click();
+    await page.getByRole('button', { name: '+ Add person' }).click();
+    await page.getByLabel('Name', { exact: true }).fill(kid);
+    await page.getByLabel('PIN of the person', { exact: true }).fill('2468');
+    await page.getByRole('button', { name: 'Save person' }).click();
+    const row = page.getByRole('listitem').filter({ hasText: kid });
+    // Only once inactive
+    await expect(row.getByRole('button', { name: `Delete ${kid}` })).toHaveCount(0);
+    await page.getByRole('button', { name: `Edit ${kid}` }).click();
+    await page.getByLabel('Active').uncheck();
+    await page.getByRole('button', { name: 'Save person' }).click();
+
+    let asked = '';
+    page.once('dialog', dialog => { asked = dialog.message(); void dialog.accept(); });
+    await row.getByRole('button', { name: `Delete ${kid}` }).click();
+    await expect(page.getByRole('listitem').filter({ hasText: kid })).toHaveCount(0);
+    expect(asked).toContain('for good');
+});
