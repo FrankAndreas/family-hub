@@ -5,7 +5,9 @@ Self-hosted on a NAS next to the apps (family-budget-dashboard, family-chore, fa
 same stack and look. German by default, English per person.
 
 - **People in one place**: name, e-mail address, PIN, parent or child, colour. Parents add family members and set PINs
-  here only; each app keeps just its own details about a person.
+  here only; each app keeps just its own details about a person. Someone who left for good is first made inactive,
+  then deleted: their PIN, address and devices leave the hub, and the name is free again. One-time links (and the
+  addresses they went to) are deleted an hour after they expired.
 - **At home** (`*.local.<domain>`): pick your name, type your PIN. The login cookie is set for `local.<domain>`, so
   every app at home gets it. Switching apps never asks again; logging out logs out of all apps. A login lasts while
   it is used: opening the hub renews it for 30 days, so only a month without opening the hub ends it.
@@ -60,7 +62,8 @@ people with access: `[{"id", "name", "role", "color", "language"}]`. An app whos
 addresses", e.g. the job tracking app) also gets `"email"`: the person's confirmed address or `null`, here and in
 `/api/session?app=<key>`; other apps get none, not even the logged-in person's own. 403 when the person asking has no
 access, 404 for an unknown key. The app keeps its own copy keyed by `id`, refreshes it now and then, and hides people
-who left the list instead of deleting their data. Logging out everywhere, a new PIN and deactivating a
+who left the list instead of deleting their data, whether they were made inactive or deleted in the hub (a deleted
+person's `id` never comes back). Logging out everywhere, a new PIN and deactivating a
 person all end a login. The app keeps its own data per person under the hub's `person.id`.
 
 The hub's tokens are EdDSA JWTs (`iss` `family-hub`, `sub` the person's id). The hub renews a login in use by

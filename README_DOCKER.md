@@ -133,6 +133,9 @@ people are gone.
   USB disk or another NAS, daily.
 - Keep every backup private: the PIN hashes in it fall to a brute force (4 digits), and the key signs logins for every
   app.
+- **Someone deleted** (Einstellungen → Personen, once inactive) is gone from the hub at once, but not from the backups:
+  from `db-backups/` once 5 newer copies exist and the last one with them is 7 days old, from Hyper Backup as its
+  version settings say. Each app keeps what it holds about the person (hidden) until it's deleted there.
 
 ### Restoring everything (a new NAS, or a lost folder)
 

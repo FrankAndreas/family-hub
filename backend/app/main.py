@@ -4,7 +4,19 @@ from contextlib import asynccontextmanager
 from fastapi import Depends, FastAPI, Response
 from sqlalchemy.exc import SQLAlchemyError
 
-from . import apps_api, auth, config, database, database_setup, keys, login_api, people_api, session_api, tiles_api
+from . import (
+    apps_api,
+    auth,
+    config,
+    database,
+    database_setup,
+    keys,
+    links,
+    login_api,
+    people_api,
+    session_api,
+    tiles_api,
+)
 from .seed import seed_admin
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
@@ -23,6 +35,9 @@ def start() -> None:
     keys.signing_key()
     with database.SessionLocal() as db:
         initial_pin = seed_admin(db)
+        # Links that expired while no new one was made (privacy review 2026-11-07)
+        links.drop_expired(db)
+        db.commit()
     if initial_pin:
         logger.warning("Created parent 'Admin' with INITIAL PIN %s. Log in and change it in the settings.", initial_pin)
 

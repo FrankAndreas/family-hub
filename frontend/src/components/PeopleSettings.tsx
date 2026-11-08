@@ -51,6 +51,14 @@ export default function PeopleSettings({ people, loadError, reload }: { people: 
         });
     };
 
+    // Someone who left for good (only once inactive): gone from the hub, with their PIN, address and devices
+    const remove = (p: Person) => {
+        if (!confirm(t('people.confirmDelete', { name: p.name }))) return;
+        void run(async () => {
+            await api.delete(`/api/people/${p.id}`);
+        });
+    };
+
     const edit = (p: Person) =>
         setForm({ id: p.id, name: p.name, email: p.email_pending ?? p.email ?? '', role: p.role, color: p.color ?? '#64748b', active: p.active, pin: '', language: p.language_chosen ? p.language : '', oldEmail: p.email_pending ?? p.email ?? '', currentPin: '', oldRole: p.role });
     const editingSelf = form !== null && form.id !== null && form.id === me?.id;
@@ -132,10 +140,17 @@ export default function PeopleSettings({ people, loadError, reload }: { people: 
                             <span className="min-w-0 break-all text-sm text-amber-300">{t('people.pendingEmail', { email: p.email_pending })}</span>
                         )}
                         {p.can_edit ? (
-                            // One form at a time: another "Edit" would throw away what is typed in the open one
-                            <button type="button" className={`${TOUCH} ml-auto text-sm text-blue-300 hover:underline disabled:opacity-30 disabled:no-underline`}
-                                disabled={form !== null} onClick={() => edit(p)}
-                                aria-label={t('people.editOf', { name: p.name })}>{t('common.edit')}</button>
+                            <span className="ml-auto flex gap-1">
+                                {!p.active && (
+                                    <button type="button" className={`${TOUCH} text-sm text-red-300 hover:underline`}
+                                        onClick={() => remove(p)}
+                                        aria-label={t('people.deleteOf', { name: p.name })}>{t('common.delete')}</button>
+                                )}
+                                {/* One form at a time: another "Edit" would throw away what is typed in the open one */}
+                                <button type="button" className={`${TOUCH} text-sm text-blue-300 hover:underline disabled:opacity-30 disabled:no-underline`}
+                                    disabled={form !== null} onClick={() => edit(p)}
+                                    aria-label={t('people.editOf', { name: p.name })}>{t('common.edit')}</button>
+                            </span>
                         ) : (
                             <span className="ml-auto text-sm text-slate-400">{t('people.ownDetails')}</span>
                         )}
