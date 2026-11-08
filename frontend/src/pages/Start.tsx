@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { useSearchParams } from 'react-router-dom';
 import { useAuth } from '../AuthContext';
 import { safeNext } from '../next';
+import { usePageTitle } from '../pageTitle';
 import type { Tile } from '../types';
 import { ERROR } from '../ui';
 import { useResource } from '../useApi';
@@ -16,6 +17,7 @@ export default function Start() {
     const { data: tiles, error } = useResource<Tile[]>('/api/tiles');
     const [params, setParams] = useSearchParams();
     const next = params.get('next');
+    usePageTitle(null);
 
     useEffect(() => {
         if (!next || !tiles) return;

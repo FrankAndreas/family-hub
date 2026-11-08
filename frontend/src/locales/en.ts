@@ -8,6 +8,7 @@ const en: typeof de = {
     languages: { de: 'Deutsch', en: 'English' },
     nav: { start: 'Start', settings: 'Settings', logout: 'Log out' },
     login: {
+        tab: 'Log in',
         title: 'Who are you?',
         pin: 'PIN',
         showPin: 'Show PIN',
@@ -59,6 +60,7 @@ const en: typeof de = {
         color: 'Colour',
         pin: 'PIN of the person',
         newPinOptional: 'New PIN (empty: unchanged)',
+        inactive: 'inactive',
         active: 'Active',
         confirmParent: '{{name}} becomes a parent. From then on only {{name}} can change their own details, PIN and role, not you any more. Save?',
         activeHint: 'Not active: logged out everywhere, gone from the login and the apps. Their data stays; someone inactive can be deleted for good.',

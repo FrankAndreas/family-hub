@@ -12,8 +12,8 @@ import Start from './pages/Start';
 function Pages() {
     const { t } = useTranslation();
     const { person, loading, unreachable } = useAuth();
-    if (unreachable) return <p role="status" className="px-4 py-10 text-center text-slate-300">{t('unreachable')}</p>;
-    if (loading) return <p role="status" className="px-4 py-10 text-center text-slate-400">{t('common.loading')}</p>;
+    if (unreachable) return <main><p role="status" className="px-4 py-10 text-center text-slate-300">{t('unreachable')}</p></main>;
+    if (loading) return <main><p role="status" className="px-4 py-10 text-center text-slate-400">{t('common.loading')}</p></main>;
     if (!person) return <Login />;
     return (
         <Layout>

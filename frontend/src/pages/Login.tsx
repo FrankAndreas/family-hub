@@ -5,6 +5,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import api, { errorMessage } from '../api';
 import { useAuth } from '../AuthContext';
 import PinInput from '../components/PinInput';
+import { usePageTitle } from '../pageTitle';
 import { BUTTON, BUTTON_SECONDARY, CARD, ERROR, TOUCH } from '../ui';
 
 interface Name { name: string; color: string | null }
@@ -26,6 +27,7 @@ export default function Login() {
     // "Forgot PIN" only when the hub can send mails; then the same answer for everyone
     const [canReset, setCanReset] = useState(false);
     const [resetSent, setResetSent] = useState(false);
+    usePageTitle(outside ? t('login.outsideTitle') : t('login.tab'));
 
     const loadNames = useCallback(() => {
         api.get<Name[]>('/api/people/public')
@@ -79,18 +81,18 @@ export default function Login() {
 
     if (outside) {
         return (
-            <div className="mx-auto max-w-md px-4 py-10">
+            <main className="mx-auto max-w-md px-4 py-10">
                 <div className={CARD}>
                     <h1 className="mb-2 text-xl font-semibold">{t('login.outsideTitle')}</h1>
                     <p className="text-slate-300">{t('login.outside')}</p>
                 </div>
-            </div>
+            </main>
         );
     }
 
     return (
-        <div className="mx-auto max-w-md px-4 py-10">
-            <h1 className="mb-6 text-center text-2xl font-semibold">🏠 {t('login.title')}</h1>
+        <main className="mx-auto max-w-md px-4 py-10">
+            <h1 className="mb-6 text-center text-2xl font-semibold"><span aria-hidden="true">🏠 </span>{t('login.title')}</h1>
             {loadError && (
                 <div className="space-y-3 text-center">
                     <p role="alert" className={ERROR}>{loadError}</p>
@@ -132,6 +134,6 @@ export default function Login() {
                     )}
                 </form>
             )}
-        </div>
+        </main>
     );
 }

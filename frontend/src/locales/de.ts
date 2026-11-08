@@ -6,6 +6,7 @@ const de = {
     languages: { de: 'Deutsch', en: 'English' },
     nav: { start: 'Start', settings: 'Einstellungen', logout: 'Abmelden' },
     login: {
+        tab: 'Anmelden',
         title: 'Wer bist du?',
         pin: 'PIN',
         showPin: 'PIN zeigen',
@@ -57,6 +58,7 @@ const de = {
         color: 'Farbe',
         pin: 'PIN der Person',
         newPinOptional: 'Neue PIN (leer: bleibt)',
+        inactive: 'inaktiv',
         active: 'Aktiv',
         confirmParent: '{{name}} wird Elternteil. Danach kann nur noch {{name}} selbst die eigenen Angaben, die PIN und die Rolle ändern, du nicht mehr. Speichern?',
         activeHint: 'Nicht aktiv: überall abgemeldet, nicht mehr in der Anmeldung und in den Apps. Die Daten bleiben; wer nicht mehr aktiv ist, lässt sich ganz löschen.',

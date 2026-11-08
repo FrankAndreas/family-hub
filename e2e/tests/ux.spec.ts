@@ -97,7 +97,7 @@ test('app key format', async ({ page }) => {
 test('tab title per language', async ({ page }) => {
     const ida = uniqueName('Ida');
     await page.goto('/');
-    await expect(page).toHaveTitle('Family');
+    await expect(page).toHaveTitle('Log in · Family');
     await logIn(page, 'Admin', ADMIN_PIN);
     await page.getByRole('link', { name: 'Settings' }).click();
     await page.getByRole('button', { name: '+ Add person' }).click();
@@ -110,9 +110,9 @@ test('tab title per language', async ({ page }) => {
     await logIn(page, ida, '2580');
     await page.getByRole('link', { name: 'Settings' }).click();
     await page.getByLabel('Language').selectOption('de');
-    await expect(page).toHaveTitle('Familie');
+    await expect(page).toHaveTitle('Einstellungen · Familie');
     await page.getByLabel('Sprache').selectOption('en');
-    await expect(page).toHaveTitle('Family');
+    await expect(page).toHaveTitle('Settings · Family');
 });
 
 // A reset link without its token says so at once, without a form to fill in first

@@ -4,6 +4,7 @@ import api from '../api';
 import { useAuth } from '../AuthContext';
 import PeopleSettings from '../components/PeopleSettings';
 import PinInput from '../components/PinInput';
+import { usePageTitle } from '../pageTitle';
 import TilesSettings from '../components/TilesSettings';
 import type { Person } from '../types';
 import { BUTTON, BUTTON_DANGER, CARD, ERROR, INPUT } from '../ui';
@@ -23,6 +24,7 @@ function Manage() {
 export default function Settings() {
     const { t } = useTranslation();
     const { person, reload } = useAuth();
+    usePageTitle(t('nav.settings'));
     const [oldPin, setOldPin] = useState('');
     const [newPin, setNewPin] = useState('');
     const [againPin, setAgainPin] = useState('');
@@ -71,6 +73,7 @@ export default function Settings() {
 
     return (
         <div className="space-y-6">
+            <h1 className="text-2xl font-semibold">{t('nav.settings')}</h1>
             {!atHome && <p className={`${CARD} text-slate-300`}>{t('settings.manageAtHome')}</p>}
             {atHome && <section className={`${CARD} space-y-3`}>
                 <h2 className="text-lg font-semibold">{t('settings.myPin')}</h2>
