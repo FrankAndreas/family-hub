@@ -11,7 +11,8 @@
     "preview": "vite preview",
     "type-check": "tsc -b",
     "check-texts": "node scripts/check-texts.mjs",
-    "test": "vitest run --passWithNoTests"
+    "test": "vitest run --passWithNoTests",
+    "prepare": "git config core.hooksPath .githooks || true"
   },
   "dependencies": {
     "axios": "^1.20.0",
