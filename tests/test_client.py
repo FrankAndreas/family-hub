@@ -6,8 +6,9 @@ import threading
 from datetime import timedelta
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
+import family_hub_client
 import pytest
-from family_hub_client import HubClient, HubUnavailable, Login, Session
+from family_hub_client import CACHE_SECONDS, GRACE_SECONDS, HubClient, HubUnavailable, Login, Session
 from family_hub_client.fake import FakeHub, cloudflare_token
 from family_hub_client.fake import token as fake_token
 from helpers import budget_tile, make_person, token
@@ -117,6 +118,59 @@ def test_what_the_client_keeps():
     assert asks(Login(fake_token("Lena"), "203.0.113.7")) == 1
     hub.forget(lena)
     assert asks(lena) == 1
+
+
+def test_a_hub_that_is_down_keeps_logins_with_access_for_a_while(monkeypatch):
+    clock = [1000.0]
+    monkeypatch.setattr(family_hub_client.time, "monotonic", lambda: clock[0])
+    hub = HubClient("budget")
+    fake = FakeHub(hub)
+    hub.transport = fake
+    lena = Login(fake.add("Lena", role="CHILD"))
+    max_ = Login(fake.add("Max", role="CHILD", access=False))
+    fake.renewing = {"Lena"}
+    assert hub.session(lena).renew
+    hub.session(max_)
+    fake.down = True
+
+    # Past the minute the hub is asked again and doesn't answer: Lena keeps her access, without the trip to the hub
+    clock[0] += CACHE_SECONDS
+    kept = hub.session(lena)
+    assert kept.person is not None and kept.person.name == "Lena"
+    assert kept.access and not kept.renew
+    # Nobody else gets in: neither a login without access, nor one the hub never confirmed
+    for login in (max_, Login("made-up"), Login(fake_token("Lena"), "203.0.113.7")):
+        with pytest.raises(HubUnavailable):
+            hub.session(login)
+    # Not for longer than the grace time since the hub last confirmed it
+    clock[0] = 1000.0 + GRACE_SECONDS
+    with pytest.raises(HubUnavailable):
+        hub.session(lena)
+
+
+def test_what_the_hub_answered_last_ends_the_grace(monkeypatch):
+    clock = [1000.0]
+    monkeypatch.setattr(family_hub_client.time, "monotonic", lambda: clock[0])
+    hub = HubClient("budget")
+    fake = FakeHub(hub)
+    hub.transport = fake
+    lena = Login(fake.add("Lena", role="CHILD"))
+    hub.session(lena)
+    # Access taken away (behind the client's back, so only the hub's next answer tells it), then the hub goes down
+    fake.access.discard("Lena")
+    clock[0] += CACHE_SECONDS
+    assert not hub.session(lena).access
+    fake.down = True
+    with pytest.raises(HubUnavailable):
+        hub.session(lena)
+    # Logging out forgets the grace too
+    fake.down = False
+    fake.access.add("Lena")
+    hub.session(lena)
+    hub.forget(lena)
+    fake.down = True
+    with pytest.raises(HubUnavailable):
+        hub.session(lena)
 
 
 def test_the_fake_tells_the_app_what_changed():

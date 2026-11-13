@@ -26,7 +26,10 @@ client = HubClient(default_app_key="budget")
 - `client.session(Login(token))` at home (the `hub_session` cookie, or a Bearer token); from outside
   `Login(cf_access_jwt_assertion, outside_ip=cf_connecting_ip)`. Returns a `Session(person, access, renew)`, kept for a
   minute (only a valid login with access, and an invalid one at home; never "no access" or an outside "not logged
-  in"). Raises `HubUnavailable` when the hub doesn't answer as expected: let nobody in then (503).
+  in"). Raises `HubUnavailable` when the hub doesn't answer as expected: let nobody in then (503). Except a login the
+  hub last confirmed "valid, with access" within `GRACE_SECONDS` (an hour): while the hub doesn't answer, it keeps that
+  answer (without `renew`), so restarting or updating the hub doesn't stop the family in the middle of using an app.
+  Nothing can be changed in the hub while it is down, so no logout or lost access is missed.
 - `session.renew`: the hub login is in its last week. Send the browser once through
   `<public_url>/?next=<the page's address>`: the hub renews the login and sends it back. The family apps do it the
   same way: the backend's login dependency sets the response header `X-Hub-Renew: 1`, and the page, when it loads who

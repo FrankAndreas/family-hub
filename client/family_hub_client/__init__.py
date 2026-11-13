@@ -3,7 +3,8 @@ who may use the app.
 
 The hub's login is a token: at home the `hub_session` cookie, passed to the hub as a Bearer token; from outside
 Cloudflare Access's token, passed on with the visitor's Cf-Connecting-Ip. Neither is ever logged. Session answers are
-kept for a minute, so a "log out everywhere" in the hub counts in the app within a minute."""
+kept for a minute, so a "log out everywhere" in the hub counts in the app within a minute. While the hub doesn't answer,
+a login that had access within the last hour keeps it, so a restart of the hub doesn't throw everyone out."""
 
 import hashlib
 import json
@@ -14,11 +15,12 @@ import urllib.error
 import urllib.parse
 import urllib.request
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Optional
 
 __all__ = [
     "CACHE_SECONDS",
+    "GRACE_SECONDS",
     "TIMEOUT_SECONDS",
     "HubClient",
     "HubPerson",
@@ -29,6 +31,8 @@ __all__ = [
 ]
 
 CACHE_SECONDS = 60
+# How long a login with access keeps it while the hub doesn't answer (a restart or an update of the hub)
+GRACE_SECONDS = 3600
 TIMEOUT_SECONDS = 5
 # Made-up logins are remembered only while fewer than this many answers are kept: a flood of them can't fill memory
 MAX_REMEMBERED = 1000
@@ -103,6 +107,8 @@ class HubClient:
         self.default_app_key = default_app_key
         self.transport: Transport = transport or self._http
         self._cache: dict[str, tuple[float, Session]] = {}
+        # The hub's last "valid, with access" per login, for while it doesn't answer
+        self._granted: dict[str, tuple[float, Session]] = {}
         self._lock = threading.Lock()
 
     def hub_url(self) -> str:
@@ -153,28 +159,49 @@ class HubClient:
         login with access, and no hub login at all (a made-up cookie costs no hub call on every request; such a token
         never becomes valid). Not kept: "no access", so someone given access a moment ago gets in at once; and "no
         login" from outside, which may be an address confirmed a moment ago or a hub that couldn't check Cloudflare's
-        token."""
+        token.
+
+        When the hub doesn't answer, a login it last answered "valid, with access" within GRACE_SECONDS keeps that
+        answer, without `renew` (sending the browser to a hub that is down would strand it); any other login gets
+        HubUnavailable. Only logins the hub confirmed are kept this way, so made-up ones can't fill memory. Nothing can
+        be changed in the hub while it is down, so no logout or lost access is missed."""
         key = self._key(login)
         now = time.monotonic()
         with self._lock:
             for stale in [k for k, (at, _) in self._cache.items() if now - at >= CACHE_SECONDS]:
                 del self._cache[stale]
+            for stale in [k for k, (at, _) in self._granted.items() if now - at >= GRACE_SECONDS]:
+                del self._granted[stale]
             if key in self._cache:
                 return self._cache[key][1]
-        found = self.fetch_session(login)
+        try:
+            found = self.fetch_session(login)
+        except HubUnavailable:
+            with self._lock:
+                granted = self._granted.get(key)
+            if granted is None:
+                raise
+            return replace(granted[1], renew=False)
         if found.person is not None:
             keep = found.access
         else:
             keep = login.outside_ip is None and len(self._cache) < MAX_REMEMBERED
-        if keep:
-            with self._lock:
+        with self._lock:
+            if keep:
                 self._cache[key] = (now, found)
+            if found.person is not None and found.access:
+                self._granted[key] = (now, found)
+            else:
+                # The hub answered otherwise (logged out, access taken away): nothing left to fall back on
+                self._granted.pop(key, None)
         return found
 
     def forget(self, login: Optional[Login] = None) -> None:
-        """Drop the kept answer for one login (logging out), or all of them (tests)."""
+        """Drop the kept answers for one login (logging out), or all of them (tests)."""
         with self._lock:
             if login is None:
                 self._cache.clear()
+                self._granted.clear()
             else:
                 self._cache.pop(self._key(login), None)
+                self._granted.pop(self._key(login), None)

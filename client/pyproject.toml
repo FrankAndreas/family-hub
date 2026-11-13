@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "family-hub-client"
-version = "1.0.0"
+version = "1.1.0"
 description = "The family apps' side of the family hub's login: who is logged in, and the app's people"
 readme = "README.md"
 license = "MIT"
