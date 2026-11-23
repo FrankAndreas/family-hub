@@ -1,7 +1,7 @@
-fastapi==0.162.5
+fastapi==0.165.0
 uvicorn==0.54.0
-sqlalchemy==2.1.8
-pydantic==2.14.3
+sqlalchemy==2.1.9
+pydantic==2.14.4
 bcrypt==5.0.0
 pyjwt==2.15.1
 # EdDSA signatures for the login tokens, RS256 for Cloudflare Access tokens
