@@ -1,3 +1,4 @@
+import { THEMES } from 'family-hub-theme';
 import { useState, type FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import api from '../api';
@@ -61,6 +62,11 @@ export default function Settings() {
         await reload();
     });
 
+    const setTheme = (theme: string) => other.run(async () => {
+        await api.patch('/api/me', { theme });
+        await reload();
+    });
+
     const logoutEverywhere = async () => {
         if (!confirm(t('settings.confirmEverywhere'))) return;
         await other.run(async () => {
@@ -74,19 +80,19 @@ export default function Settings() {
     return (
         <div className="space-y-6">
             <h1 className="text-2xl font-semibold">{t('nav.settings')}</h1>
-            {!atHome && <p className={`${CARD} text-slate-300`}>{t('settings.manageAtHome')}</p>}
+            {!atHome && <p className={`${CARD} text-ink`}>{t('settings.manageAtHome')}</p>}
             {atHome && <section className={`${CARD} space-y-3`}>
                 <h2 className="text-lg font-semibold">{t('settings.myPin')}</h2>
                 <form onSubmit={changePin} className="grid gap-2 sm:grid-cols-3">
-                    <div className="text-sm text-slate-400">
+                    <div className="text-sm text-muted">
                         <label htmlFor="old-pin">{t('settings.oldPin')}</label>
                         <PinInput id="old-pin" value={oldPin} onChange={typed(setOldPin)} />
                     </div>
-                    <div className="text-sm text-slate-400">
+                    <div className="text-sm text-muted">
                         <label htmlFor="new-pin">{t('settings.newPin')}</label>
                         <PinInput id="new-pin" value={newPin} onChange={typed(setNewPin)} autoComplete="new-password" />
                     </div>
-                    <div className="text-sm text-slate-400">
+                    <div className="text-sm text-muted">
                         <label htmlFor="again-pin">{t('settings.againPin')}</label>
                         <PinInput id="again-pin" value={againPin} onChange={typed(setAgainPin)} autoComplete="new-password" />
                     </div>
@@ -95,17 +101,23 @@ export default function Settings() {
                         {t('settings.changePin')}
                     </button>
                 </form>
-                {message && <p role="status" className="text-sm text-emerald-300">{message}</p>}
+                {message && <p role="status" className="text-sm text-success">{message}</p>}
                 {pinChange.error && <p role="alert" className={ERROR}>{pinChange.error}</p>}
             </section>}
             <section className={`${CARD} space-y-3`}>
                 <div className="flex flex-wrap items-end gap-4">
-                    <label className="text-sm text-slate-400">{t('settings.language')}
+                    <label className="text-sm text-muted">{t('settings.language')}
                         <select className={INPUT} value={person?.language ?? 'de'} onChange={e => void setLanguage(e.target.value)}>
                             <option value="de">{t('languages.de')}</option>
                             <option value="en">{t('languages.en')}</option>
                         </select>
                     </label>
+                    {/* Shown once there is more than one theme to pick from (themes design 2026-11-28) */}
+                    {THEMES.length > 1 && <label className="text-sm text-muted">{t('settings.theme')}
+                        <select className={INPUT} value={person?.theme ?? 'aurora'} onChange={e => void setTheme(e.target.value)}>
+                            {THEMES.map(theme => <option key={theme} value={theme}>{t(`themes.${theme}`, { defaultValue: theme })}</option>)}
+                        </select>
+                    </label>}
                     <button type="button" className={BUTTON_DANGER} onClick={() => void logoutEverywhere()}>{t('settings.logoutEverywhere')}</button>
                 </div>
                 {other.error && <p role="alert" className={ERROR}>{other.error}</p>}

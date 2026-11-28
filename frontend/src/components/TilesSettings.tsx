@@ -68,25 +68,25 @@ export default function TilesSettings({ people }: { people: Person[] }) {
                 <h2 className="text-lg font-semibold">{t('tiles.title')}</h2>
                 {!form && <button type="button" className={BUTTON_SECONDARY} onClick={() => setForm(empty)}>{t('tiles.add')}</button>}
             </div>
-            <p className="text-sm text-slate-400">{t('tiles.intro')}</p>
+            <p className="text-sm text-muted">{t('tiles.intro')}</p>
             {error && <p role="alert" className={ERROR}>{error}</p>}
             {form && (
                 <form ref={formRef} onSubmit={save} className="grid gap-2 sm:grid-cols-2">
-                    <label className="text-sm text-slate-400">{t('tiles.name')}
+                    <label className="text-sm text-muted">{t('tiles.name')}
                         <input className={INPUT} value={form.name} required maxLength={50} onChange={e => setForm({ ...form, name: e.target.value })} />
                     </label>
-                    <label className="text-sm text-slate-400">{t('tiles.icon')}
+                    <label className="text-sm text-muted">{t('tiles.icon')}
                         <input className={INPUT} value={form.icon} maxLength={16} onChange={e => setForm({ ...form, icon: e.target.value })} />
                     </label>
-                    <label className="text-sm text-slate-400">{t('tiles.localUrl')}
+                    <label className="text-sm text-muted">{t('tiles.localUrl')}
                         <input className={INPUT} type="url" value={form.local_url} required placeholder={t('tiles.localExample')}
                             onChange={e => setForm({ ...form, local_url: e.target.value })} />
                     </label>
-                    <label className="text-sm text-slate-400">{t('tiles.remoteUrl')}
+                    <label className="text-sm text-muted">{t('tiles.remoteUrl')}
                         <input className={INPUT} type="url" value={form.remote_url} placeholder={t('tiles.remoteEmpty')}
                             onChange={e => setForm({ ...form, remote_url: e.target.value })} />
                     </label>
-                    <div className="text-sm text-slate-400">
+                    <div className="text-sm text-muted">
                         <label>{t('tiles.appKey')}
                             <input className={`${INPUT} disabled:opacity-50`} value={form.app_key} maxLength={20} pattern="[a-z][a-z0-9\-]{1,19}"
                                 title={t('tiles.appKeyFormat')}
@@ -96,7 +96,7 @@ export default function TilesSettings({ people }: { people: Person[] }) {
                         {keyLocked && <p id="key-locked" className="mt-1 text-xs">{t('tiles.keyLocked', { names: names(form.protected) })}</p>}
                     </div>
                     {form.app_key.trim() && (
-                        <fieldset className="text-sm text-slate-400 sm:col-span-2">
+                        <fieldset className="text-sm text-muted sm:col-span-2">
                             <legend>{t('tiles.who')}</legend>
                             <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1">
                                 {people.filter(p => p.active).map(person => {
@@ -104,7 +104,7 @@ export default function TilesSettings({ people }: { people: Person[] }) {
                                     const lastUsed = form.last_used[person.id];
                                     return (
                                         <span key={person.id} className="flex items-center gap-1">
-                                            <label className={`flex items-center gap-1 text-slate-200 ${locked ? 'opacity-50' : ''}`}
+                                            <label className={`flex items-center gap-1 text-ink ${locked ? 'opacity-50' : ''}`}
                                                 title={locked ? t('tiles.lockedParent', { name: person.name }) : undefined}>
                                                 <input type="checkbox" checked={form.people.includes(person.id)} disabled={locked}
                                                     onChange={e => setForm({
@@ -122,7 +122,7 @@ export default function TilesSettings({ people }: { people: Person[] }) {
                                     );
                                 })}
                             </div>
-                            <label className="mt-2 flex items-center gap-1 text-slate-200">
+                            <label className="mt-2 flex items-center gap-1 text-ink">
                                 <input type="checkbox" checked={form.share_email}
                                     onChange={e => setForm({ ...form, share_email: e.target.checked })} />
                                 {t('tiles.shareEmail')}
@@ -135,24 +135,24 @@ export default function TilesSettings({ people }: { people: Person[] }) {
                     )}
                     <div className="flex gap-2 sm:col-span-2">
                         <button type="submit" className={BUTTON}>{t('tiles.save')}</button>
-                        <button type="button" className="px-3 text-slate-400 hover:text-white" onClick={() => setForm(null)}>{t('common.cancel')}</button>
+                        <button type="button" className="px-3 text-muted hover:text-ink" onClick={() => setForm(null)}>{t('common.cancel')}</button>
                     </div>
                 </form>
             )}
-            <ul className="divide-y divide-white/5">
+            <ul className="divide-y divide-line">
                 {tiles.map((tile, index) => (
                     <li key={tile.id} className="flex flex-wrap items-center gap-2 py-2">
                         <span aria-hidden="true" className="text-xl">{tile.icon || '🔗'}</span>
                         <span className="min-w-0 break-words font-medium">{tile.name}</span>
-                        <span className="text-sm text-slate-400">{tile.remote_url ? t('tiles.alsoOutside') : t('tiles.homeOnly')}</span>
-                        {tile.app_key && <span className="text-sm text-slate-400">· {t('tiles.peopleCount', { count: people.filter(p => p.active && tile.people.includes(p.id)).length })}</span>}
+                        <span className="text-sm text-muted">{tile.remote_url ? t('tiles.alsoOutside') : t('tiles.homeOnly')}</span>
+                        {tile.app_key && <span className="text-sm text-muted">· {t('tiles.peopleCount', { count: people.filter(p => p.active && tile.people.includes(p.id)).length })}</span>}
                         <span className="ml-auto flex gap-2 text-sm">
-                            <button type="button" disabled={index === 0} className={`${TOUCH} text-slate-400 hover:text-white disabled:opacity-30`}
+                            <button type="button" disabled={index === 0} className={`${TOUCH} text-muted hover:text-ink disabled:opacity-30`}
                                 aria-label={t('tiles.up', { name: tile.name })} onClick={() => move(index, -1)}>↑</button>
-                            <button type="button" disabled={index === tiles.length - 1} className={`${TOUCH} text-slate-400 hover:text-white disabled:opacity-30`}
+                            <button type="button" disabled={index === tiles.length - 1} className={`${TOUCH} text-muted hover:text-ink disabled:opacity-30`}
                                 aria-label={t('tiles.down', { name: tile.name })} onClick={() => move(index, 1)}>↓</button>
                             {/* One form at a time: another "Edit" would throw away what is typed in the open one */}
-                            <button type="button" className={`${TOUCH} text-blue-300 hover:underline disabled:opacity-30 disabled:no-underline`}
+                            <button type="button" className={`${TOUCH} text-accent hover:underline disabled:opacity-30 disabled:no-underline`}
                                 aria-label={t('tiles.editOf', { name: tile.name })} disabled={form !== null}
                                 onClick={() => setForm({
                                     id: tile.id, name: tile.name, icon: tile.icon, local_url: tile.local_url, remote_url: tile.remote_url ?? '',
@@ -162,7 +162,7 @@ export default function TilesSettings({ people }: { people: Person[] }) {
                                 })}>
                                 {t('common.edit')}
                             </button>
-                            <button type="button" className={`${TOUCH} text-red-300 hover:underline disabled:opacity-30 disabled:no-underline`}
+                            <button type="button" className={`${TOUCH} text-danger hover:underline disabled:opacity-30 disabled:no-underline`}
                                 aria-label={t('tiles.deleteOf', { name: tile.name })} disabled={tile.locked_people.length > 0}
                                 title={tile.locked_people.length > 0 ? t('tiles.deleteLocked', { names: names(tile.locked_people) }) : undefined}
                                 onClick={() => remove(tile)}>{t('common.delete')}</button>
