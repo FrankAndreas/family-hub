@@ -35,6 +35,8 @@ client = HubClient(default_app_key="budget")
   same way: the backend's login dependency sets the response header `X-Hub-Renew: 1`, and the page, when it loads who
   is logged in, goes through the hub at most once a day (a time in `localStorage`; without storage not at all, so it
   can never loop).
+- `HubPerson.theme`: the person's theme for `family-hub-theme`'s `applyTheme` (send it to the page with who is logged
+  in); `"aurora"` from a hub that doesn't send one. `FakeHub.add(..., theme=)` and `set_theme()` in tests.
 - `client.fetch_people(login)`: the app's people (`[]` when the person asking may not ask); `HubPerson.email_shared`
   says whether the app's tile shares addresses (then `email` is the confirmed address or `None`).
 - `client.hub_url()`, `client.public_url()`, `client.app_key()`: from `HUB_URL`, `HUB_PUBLIC_URL`, `HUB_APP_KEY`.

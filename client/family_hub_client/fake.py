@@ -55,12 +55,13 @@ class FakeHub:
         language: str = "de",
         color: Optional[str] = None,
         id: Optional[int] = None,
+        theme: str = "aurora",
     ) -> str:
         """A person in the hub (with access to the app unless access=False); returns their hub token."""
         if id is None:
             id = self._next_id
         self._next_id = max(self._next_id, id) + 1
-        self.people[name] = HubPerson(id=id, name=name, role=role, color=color, language=language)
+        self.people[name] = HubPerson(id=id, name=name, role=role, color=color, language=language, theme=theme)
         if access:
             self.access.add(name)
         self._changed()
@@ -90,6 +91,9 @@ class FakeHub:
 
     def set_language(self, name: str, language: str) -> None:
         self.people[name] = replace(self.people[name], language=language)
+
+    def set_theme(self, name: str, theme: str) -> None:
+        self.people[name] = replace(self.people[name], theme=theme)
         self._changed()
 
     # What the hub answers
@@ -106,6 +110,7 @@ class FakeHub:
     def _json(self, person: HubPerson, with_email: bool) -> dict:
         found: dict = {"id": person.id, "name": person.name, "role": person.role, "color": person.color}
         found["language"] = person.language
+        found["theme"] = person.theme
         if with_email:
             found["email"] = self.emails.get(person.name)
         return found
