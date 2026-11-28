@@ -15,8 +15,10 @@ test('the page applies the person theme, and the default after logout', async ({
     await expect.poll(() => remembered(page)).toBe('aurora');
     // The theme's roles reach the page: glass cards with their blur (Settings always has cards; Start may have none)
     await page.getByRole('link', { name: 'Settings' }).click();
-    const blur = await page.locator('.glass-card').first().evaluate(e => getComputedStyle(e).backdropFilter);
-    expect(blur).toContain('blur');
+    await expect(page.getByRole('heading', { name: 'Settings', level: 1 })).toBeVisible();
+    // Asked again until it holds: right after the click a card of the page being left may still be found, and a
+    // removed element has no style (CI failure 2026-11-28)
+    await expect.poll(() => page.locator('.glass-card').first().evaluate(e => getComputedStyle(e).backdropFilter)).toContain('blur');
     await page.evaluate(() => localStorage.setItem('family-theme', 'stale'));
     await page.getByRole('button', { name: 'Log out', exact: true }).click();
     await expect(page.getByRole('heading', { name: 'Who are you?' })).toBeVisible();
