@@ -1,0 +1,28 @@
+name: Theme release
+
+# The family-hub-theme package for the apps (theme/README.md): a tag theme-v<version> publishes the packed folder as
+# a release asset, the address the apps install from
+on:
+  push:
+    tags: ['theme-v*']
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+      - name: The tag matches the package's version
+        run: |
+          version=$(node -p "require('./theme/package.json').version")
+          test "${GITHUB_REF_NAME}" = "theme-v${version}" || { echo "Tag ${GITHUB_REF_NAME} but theme/package.json says ${version}"; exit 1; }
+          echo "VERSION=${version}" >> "$GITHUB_ENV"
+      - run: cd theme && npm pack
+      - name: Release with the packed package
+        run: |
+          url="https://github.com/${GITHUB_REPOSITORY}/releases/download/${GITHUB_REF_NAME}/family-hub-theme-${VERSION}.tgz"
+          gh release create "${GITHUB_REF_NAME}" "theme/family-hub-theme-${VERSION}.tgz" \
+            --title "family-hub-theme ${VERSION}" --notes "Install from ${url}"
+        env:
+          GH_TOKEN: ${{ github.token }}
