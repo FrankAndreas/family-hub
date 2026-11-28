@@ -52,7 +52,10 @@ services:
 
   frontend:
     image: ghcr.io/frankandreas/family-hub/frontend:latest
-    build: ./frontend
+    # From the repository root: the page uses the theme package in theme/
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
     container_name: hub-frontend
     ports:
       - "${PORT:-8086}:8080"

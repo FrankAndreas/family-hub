@@ -21,8 +21,13 @@ jobs:
           # Registry paths must be lowercase; change these if the repository moves
           - component: backend
             image: ghcr.io/frankandreas/family-hub/backend
+            context: backend
+            file: backend/Dockerfile
+          # From the repository root: the page uses the theme package in theme/
           - component: frontend
             image: ghcr.io/frankandreas/family-hub/frontend
+            context: .
+            file: frontend/Dockerfile
     steps:
       - uses: actions/checkout@v7
       - uses: docker/setup-buildx-action@v4
@@ -40,7 +45,8 @@ jobs:
             type=sha
       - uses: docker/build-push-action@v7
         with:
-          context: ${{ matrix.component }}
+          context: ${{ matrix.context }}
+          file: ${{ matrix.file }}
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
