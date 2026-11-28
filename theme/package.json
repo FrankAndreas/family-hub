@@ -1,0 +1,13 @@
+{
+  "name": "family-hub-theme",
+  "version": "1.0.0",
+  "description": "The family apps' look: colours and shapes by role, one set of values per theme (family-hub)",
+  "license": "MIT",
+  "type": "module",
+  "exports": {
+    ".": { "types": "./index.d.ts", "default": "./index.js" },
+    "./theme.css": "./theme.css",
+    "./theme-init.js": "./theme-init.js"
+  },
+  "files": ["theme.css", "index.js", "index.d.ts", "theme-init.js", "README.md"]
+}

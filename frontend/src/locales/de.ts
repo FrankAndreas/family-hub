@@ -4,6 +4,7 @@ const de = {
     common: { cancel: 'Abbrechen', edit: 'Bearbeiten', delete: 'Löschen', loading: 'Laden …' },
     unreachable: 'Der Familien-Hub ist gerade nicht erreichbar (er startet vielleicht neu). Es wird weiter versucht …',
     languages: { de: 'Deutsch', en: 'English' },
+    themes: { aurora: 'Aurora' },
     nav: { start: 'Start', settings: 'Einstellungen', logout: 'Abmelden' },
     login: {
         tab: 'Anmelden',
@@ -35,6 +36,7 @@ const de = {
         none: 'Noch keine Apps. Eltern fügen sie in den Einstellungen hinzu.',
     },
     settings: {
+        theme: 'Thema',
         myPin: 'Meine PIN',
         oldPin: 'Bisherige PIN',
         newPin: 'Neue PIN',

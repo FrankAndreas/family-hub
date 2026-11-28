@@ -27,18 +27,18 @@ export default function Start() {
     }, [next, tiles, setParams]);
 
     // On the way back to the app: no flash of the start page (an unknown ?next= is dropped, and the page shows)
-    if (next && !error) return <p role="status" className="text-slate-400">{t('common.loading')}</p>;
+    if (next && !error) return <p role="status" className="text-muted">{t('common.loading')}</p>;
 
     return (
         <>
             <h1 className="mb-4 text-2xl font-semibold">{t('start.hello', { name: person?.name ?? '' })}</h1>
             {error && <p role="alert" className={ERROR}>{error}</p>}
-            {tiles === null && !error && <p role="status" className="text-slate-400">{t('common.loading')}</p>}
-            {tiles && tiles.length === 0 && <p className="text-slate-400">{t('start.none')}</p>}
+            {tiles === null && !error && <p role="status" className="text-muted">{t('common.loading')}</p>}
+            {tiles && tiles.length === 0 && <p className="text-muted">{t('start.none')}</p>}
             <ul className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
                 {(tiles ?? []).map(tile => (
                     <li key={tile.id}>
-                        <a href={tile.url} className="glass-card flex h-full flex-col items-center gap-2 p-5 text-center hover:bg-white/5">
+                        <a href={tile.url} className="glass-card flex h-full flex-col items-center gap-2 p-5 text-center hover:bg-hover">
                             <span aria-hidden="true" className="text-4xl">{tile.icon || '🔗'}</span>
                             <span className="break-words text-lg font-medium">{tile.name}</span>
                         </a>

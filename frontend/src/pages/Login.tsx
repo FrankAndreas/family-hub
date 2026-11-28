@@ -6,6 +6,7 @@ import api, { errorMessage } from '../api';
 import { useAuth } from '../AuthContext';
 import PinInput from '../components/PinInput';
 import { usePageTitle } from '../pageTitle';
+import { DEFAULT_PERSON_COLOR } from '../person';
 import { BUTTON, BUTTON_SECONDARY, CARD, ERROR, TOUCH } from '../ui';
 
 interface Name { name: string; color: string | null }
@@ -84,7 +85,7 @@ export default function Login() {
             <main className="mx-auto max-w-md px-4 py-10">
                 <div className={CARD}>
                     <h1 className="mb-2 text-xl font-semibold">{t('login.outsideTitle')}</h1>
-                    <p className="text-slate-300">{t('login.outside')}</p>
+                    <p className="text-ink">{t('login.outside')}</p>
                 </div>
             </main>
         );
@@ -99,13 +100,13 @@ export default function Login() {
                     <button type="button" className={BUTTON_SECONDARY} onClick={() => { setLoadError(''); loadNames(); }}>{t('login.retry')}</button>
                 </div>
             )}
-            {names === null && !loadError && <p role="status" className="text-center text-slate-400">{t('common.loading')}</p>}
+            {names === null && !loadError && <p role="status" className="text-center text-muted">{t('common.loading')}</p>}
             {!chosen ? (
                 <div className="grid grid-cols-2 gap-3">
                     {(names ?? []).map(n => (
                         <button key={n.name} type="button" onClick={() => setChosen(n.name)}
-                            className="glass-card flex items-center gap-3 p-4 text-left text-lg hover:bg-white/5">
-                            <span aria-hidden="true" className="h-4 w-4 shrink-0 rounded-full" style={{ background: n.color ?? '#64748b' }} />
+                            className="glass-card flex items-center gap-3 p-4 text-left text-lg hover:bg-hover">
+                            <span aria-hidden="true" className="h-4 w-4 shrink-0 rounded-full" style={{ background: n.color ?? DEFAULT_PERSON_COLOR }} />
                             <span className="min-w-0 break-words">{n.name}</span>
                         </button>
                     ))}
@@ -120,15 +121,15 @@ export default function Login() {
                         if (value.length === 4) void logIn(value);
                     }} />
                     {error && <p role="alert" className={ERROR}>{error}</p>}
-                    {resetSent && <p role="status" className="text-slate-300">{t('login.resetSent')}</p>}
+                    {resetSent && <p role="status" className="text-ink">{t('login.resetSent')}</p>}
                     <div className="flex gap-2">
                         <button type="submit" className={`${BUTTON} flex-1`} disabled={pin.length !== 4}>{t('login.submit')}</button>
-                        <button type="button" className="px-3 text-slate-400 hover:text-white" onClick={() => { setChosen(null); setPin(''); setError(''); setResetSent(false); }}>
+                        <button type="button" className="px-3 text-muted hover:text-ink" onClick={() => { setChosen(null); setPin(''); setError(''); setResetSent(false); }}>
                             {t('login.otherPerson')}
                         </button>
                     </div>
                     {canReset && !resetSent && (
-                        <button type="button" className={`${TOUCH} text-sm text-blue-300 hover:underline`} onClick={() => void forgot()}>
+                        <button type="button" className={`${TOUCH} text-sm text-accent hover:underline`} onClick={() => void forgot()}>
                             {t('login.forgot')}
                         </button>
                     )}

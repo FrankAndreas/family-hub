@@ -182,6 +182,10 @@ def test_the_fake_tells_the_app_what_changed():
     assert hub.session(lena).person.role == "CHILD"
     fake.set_role("Lena", "PARENT")
     assert hub.session(lena).person.role == "PARENT" and forgotten
+    fake.set_language("Lena", "en")
+    assert hub.session(lena).person.language == "en"
+    fake.set_theme("Lena", "daely")
+    assert hub.session(lena).person.theme == "daely"
     fake.rename("Lena", "Lea")
     assert hub.session(Login(fake_token("Lea"))).person.name == "Lea"
     fake.down = True
@@ -219,7 +223,7 @@ def http_hub(monkeypatch):
 
 
 def test_the_client_over_http(http_hub, monkeypatch):
-    person = {"id": 7, "name": "Lena", "role": "CHILD", "color": None, "language": "en"}
+    person = {"id": 7, "name": "Lena", "role": "CHILD", "color": None, "language": "en", "theme": "daely"}
     http_hub.answers = {
         "/api/session?app=budget": (200, json.dumps({"valid": True, "person": person, "access": True}).encode()),
         "/api/apps/budget/people": (403, b'{"detail": "no_access"}'),
@@ -227,6 +231,8 @@ def test_the_client_over_http(http_hub, monkeypatch):
     hub = HubClient("budget")
     found = hub.fetch_session(Login("tok"))
     assert found.person.language == "en" and found.person.email_shared is False and found.renew is False
+    # The client passes on themes the hub knows, even ones this client's app doesn't have yet
+    assert found.person.theme == "daely"
     assert http_hub.seen[-1]["Authorization"] == "Bearer tok"
     hub.fetch_session(Login("cf", "203.0.113.7"))
     assert "Authorization" not in http_hub.seen[-1]
@@ -262,3 +268,20 @@ def test_the_addresses_from_the_settings(monkeypatch):
     monkeypatch.setenv("HUB_URL", "http://192.0.2.5:8086/")
     monkeypatch.setenv("HUB_PUBLIC_URL", "https://home.local.example.ch/")
     assert (hub.hub_url(), hub.public_url()) == ("http://192.0.2.5:8086", "https://home.local.example.ch")
+
+
+def test_an_older_hub_without_themes(http_hub):
+    person = {"id": 7, "name": "Lena", "role": "CHILD", "color": None, "language": "en"}
+    http_hub.answers = {
+        "/api/session?app=budget": (200, json.dumps({"valid": True, "person": person, "access": True}).encode())
+    }
+    assert HubClient("budget").fetch_session(Login("tok")).person.theme == "aurora"
+
+
+def test_the_fake_sets_a_theme():
+    fake = FakeHub(HubClient("budget"))
+    fake.add("Lena")
+    fake.add("Mia", theme="daely")
+    assert fake.people["Lena"].theme == "aurora"
+    fake.set_theme("Lena", "daely")
+    assert fake.people["Lena"].theme == fake.people["Mia"].theme == "daely"

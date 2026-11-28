@@ -1,0 +1,16 @@
+# Only the frontend image is built from the repository root (frontend/Dockerfile); the backend keeps ./backend
+**/node_modules
+**/__pycache__
+**/dist
+venv
+backend
+client
+e2e
+tests
+docs
+scripts
+.git
+.github
+.superpowers
+*.db
+frontend/public/theme-init.js

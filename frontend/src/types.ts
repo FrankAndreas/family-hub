@@ -14,6 +14,8 @@ export interface Person {
     color: string | null;
     language: Language;
     language_chosen: boolean;
+    // The person's look (family-hub-theme); "aurora" until they pick another
+    theme: string;
     // Managing people, PINs and apps happens at home only
     at_home: boolean;
     // In the parents' list: whether the parent asking may change this person (not another parent)

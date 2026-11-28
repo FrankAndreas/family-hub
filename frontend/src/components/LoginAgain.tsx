@@ -16,7 +16,7 @@ export default function LoginAgain() {
     }, []);
     if (!shown) return null;
     return (
-        <div role="alert" className="mb-4 flex flex-wrap items-center gap-3 rounded-lg border border-amber-500/40 bg-amber-500/10 p-3">
+        <div role="alert" className="mb-4 flex flex-wrap items-center gap-3 rounded-lg border border-warning/40 bg-warning/10 p-3">
             <p className="mr-auto">{t('errors.login_again')}</p>
             <Link to="/logout" className={BUTTON}>{t('loginAgain.button')}</Link>
         </div>

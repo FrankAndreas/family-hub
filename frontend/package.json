@@ -5,17 +5,22 @@
   "license": "MIT",
   "type": "module",
   "scripts": {
+    "predev": "npm run theme:copy",
     "dev": "vite",
+    "prebuild": "npm run theme:copy",
     "build": "tsc -b && vite build",
-    "lint": "eslint . --report-unused-disable-directives --max-warnings 0 && npm run check-texts",
+    "lint": "eslint . --report-unused-disable-directives --max-warnings 0 && npm run check-texts && npm run check-colors",
     "preview": "vite preview",
     "type-check": "tsc -b",
+    "check-colors": "node scripts/check-colors.mjs --self-test && node scripts/check-colors.mjs",
     "check-texts": "node scripts/check-texts.mjs",
     "test": "vitest run --passWithNoTests",
-    "prepare": "git config core.hooksPath .githooks || true"
+    "prepare": "git config core.hooksPath .githooks || true",
+    "theme:copy": "node -e \"const fs=require('fs');fs.mkdirSync('public',{recursive:true});fs.copyFileSync('node_modules/family-hub-theme/theme-init.js','public/theme-init.js')\""
   },
   "dependencies": {
     "axios": "^1.21.1",
+    "family-hub-theme": "file:../theme",
     "i18next": "26.7.2",
     "react": "^19.3.0",
     "react-dom": "^19.3.1",

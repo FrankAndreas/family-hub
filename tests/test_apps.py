@@ -12,7 +12,14 @@ def test_people_of_an_app(client, db):
     budget_tile(db, lena, admin)
     found = client.get("/api/apps/budget/people", headers=bearer(auth.issue_tokens(admin)[0])).json()
     assert [p["name"] for p in found] == ["Admin", "Lena"]
-    assert found[1] == {"id": lena.id, "name": "Lena", "role": "CHILD", "color": "#f59e0b", "language": "de"}
+    assert found[1] == {
+        "id": lena.id,
+        "name": "Lena",
+        "role": "CHILD",
+        "color": "#f59e0b",
+        "language": "de",
+        "theme": "aurora",
+    }
     assert client.get("/api/apps/budget/people", headers=bearer(auth.issue_tokens(max_)[0])).status_code == 403
     assert client.get("/api/apps/nope/people", headers=bearer(auth.issue_tokens(admin)[0])).status_code == 404
     assert client.get("/api/apps/budget/people").status_code == 401

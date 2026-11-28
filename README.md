@@ -97,6 +97,15 @@ Managing the hub (people, PINs, apps) needs a second cookie, `hub_manage`, that 
 Not logged in: send the person to `https://home.local.<domain>/?next=<the app's address>`. After the login the hub
 sends them back, if the address belongs to an app on its start page; someone still logged in goes back at once.
 
+
+### The look (family-hub-theme)
+
+The apps that log in through the hub share one look from the package in [theme/](theme/README.md): colours and shapes
+by role, one set of values per theme. Each person picks their theme in the hub (`PATCH /api/me {"theme"}`, like the
+language); the hub sends it with the person (`theme` in `/api/session` and `/api/apps/<key>/people`,
+`HubPerson.theme` in the client). An app returns it with its own who-am-I answer and calls `applyTheme` with it.
+Install: `https://github.com/FrankAndreas/family-hub/releases/download/theme-v<version>/family-hub-theme-<version>.tgz`.
+
 ## Development
 
 ```bash

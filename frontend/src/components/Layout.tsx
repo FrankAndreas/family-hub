@@ -8,7 +8,7 @@ import { logoutAddress } from '../next';
 
 // The page one is on stands out (NavLink also sets aria-current="page")
 const navClass = ({ isActive }: { isActive: boolean }) =>
-    `${TOUCH} ${isActive ? 'font-semibold text-white underline decoration-cyan-400 decoration-2 underline-offset-8' : 'text-slate-300 hover:text-white'}`;
+    `${TOUCH} ${isActive ? 'font-semibold text-ink underline decoration-accent decoration-2 underline-offset-8' : 'text-muted hover:text-ink'}`;
 
 // The frame of every page once logged in: the family's name, Start, Settings, and logging out
 export default function Layout({ children }: { children: ReactNode }) {
@@ -30,7 +30,7 @@ export default function Layout({ children }: { children: ReactNode }) {
     return (
         <div className="mx-auto max-w-5xl px-4 py-4">
             <header className="mb-6 flex flex-wrap items-center gap-3">
-                <Link to="/" className="mr-auto text-xl font-semibold text-slate-100"><span aria-hidden="true">🏠 </span>{t('app.title')}</Link>
+                <Link to="/" className="mr-auto text-xl font-semibold text-ink"><span aria-hidden="true">🏠 </span>{t('app.title')}</Link>
                 <nav className="flex flex-wrap items-center gap-3 text-sm">
                     <NavLink to="/" end className={navClass}>{t('nav.start')}</NavLink>
                     <NavLink to="/settings" className={navClass}>{t('nav.settings')}</NavLink>

@@ -90,6 +90,14 @@ def test_own_language_and_colour(client):
     assert (me["language"], me["language_chosen"], me["color"]) == ("en", True, "#10b981")
 
 
+def test_own_theme(client):
+    login(client)
+    assert client.get("/api/me").json()["theme"] == "aurora"
+    me = client.patch("/api/me", json={"theme": "aurora"})
+    assert me.status_code == 200 and me.json()["theme"] == "aurora"
+    assert client.patch("/api/me", json={"theme": "daely"}).status_code == 422
+
+
 # Each parent changes only themselves and the children (hub hardening, spec 2026-10-30, part 2)
 
 

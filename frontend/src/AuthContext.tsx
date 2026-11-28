@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
+import { applyTheme } from 'family-hub-theme';
 import api from './api';
 import { applyLanguage } from './i18n';
 import { guestLanguage } from './language';
@@ -45,6 +46,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 setUnreachable(false);
                 setPerson(res.data);
                 applyLanguage(res.data.language);
+                applyTheme(res.data.theme);
                 setLoading(false);
             },
             async err => {
@@ -62,6 +64,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 }
                 setUnreachable(false);
                 setPerson(null);
+                // Logged out: the default look, not the last person's (a shared iPad's login screen)
+                applyTheme(null);
                 applyLanguage(await guestLanguage());
                 setLoading(false);
             },
@@ -83,6 +87,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         loggingOut.current = done.catch(() => undefined);
         await done;
         setPerson(null);
+        applyTheme(null);
     }, []);
 
     return <AuthContext.Provider value={{ person, loading, unreachable, reload, logout }}>{children}</AuthContext.Provider>;

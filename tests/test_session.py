@@ -16,7 +16,14 @@ def test_session_for_apps(client, db):
     found = client.get("/api/session", headers=bearer(token)).json()
     assert found == {
         "valid": True,
-        "person": {"id": lena.id, "name": "Lena", "role": "CHILD", "color": "#f59e0b", "language": "de"},
+        "person": {
+            "id": lena.id,
+            "name": "Lena",
+            "role": "CHILD",
+            "color": "#f59e0b",
+            "language": "de",
+            "theme": "aurora",
+        },
         "renew": False,
     }
     # The cookie at home counts as well

@@ -6,6 +6,7 @@ import type { Language, Person, Role } from '../types';
 import { BUTTON, BUTTON_SECONDARY, CARD, ERROR, INPUT, TOUCH } from '../ui';
 import { useAction, useResource } from '../useApi';
 import PinInput from './PinInput';
+import { DEFAULT_PERSON_COLOR } from '../person';
 import { useFormFocus } from './useFormFocus';
 
 interface Form {
@@ -18,7 +19,7 @@ interface Form {
     oldRole: Role | null;
 }
 
-const empty: Form = { id: null, name: '', email: '', role: 'CHILD', color: '#64748b', active: true, pin: '', language: '', oldEmail: '', currentPin: '', oldRole: null };
+const empty: Form = { id: null, name: '', email: '', role: 'CHILD', color: DEFAULT_PERSON_COLOR, active: true, pin: '', language: '', oldEmail: '', currentPin: '', oldRole: null };
 
 // Parents: the family's people, in one place for every app (name, e-mail for Cloudflare, role, colour, PIN). The list
 // comes from the settings page, which shares it with the apps' section
@@ -60,7 +61,7 @@ export default function PeopleSettings({ people, loadError, reload }: { people: 
     };
 
     const edit = (p: Person) =>
-        setForm({ id: p.id, name: p.name, email: p.email_pending ?? p.email ?? '', role: p.role, color: p.color ?? '#64748b', active: p.active, pin: '', language: p.language_chosen ? p.language : '', oldEmail: p.email_pending ?? p.email ?? '', currentPin: '', oldRole: p.role });
+        setForm({ id: p.id, name: p.name, email: p.email_pending ?? p.email ?? '', role: p.role, color: p.color ?? DEFAULT_PERSON_COLOR, active: p.active, pin: '', language: p.language_chosen ? p.language : '', oldEmail: p.email_pending ?? p.email ?? '', currentPin: '', oldRole: p.role });
     const editingSelf = form !== null && form.id !== null && form.id === me?.id;
     const emailChanged = editingSelf && form.email.trim() !== form.oldEmail;
     // A new address waits for the link mailed to it (backend addresses.py)
@@ -73,87 +74,87 @@ export default function PeopleSettings({ people, loadError, reload }: { people: 
                 <h2 className="text-lg font-semibold">{t('people.title')}</h2>
                 {!form && <button type="button" className={BUTTON_SECONDARY} onClick={() => setForm(empty)}>{t('people.add')}</button>}
             </div>
-            <p className="text-sm text-slate-400">{t('people.intro')}</p>
+            <p className="text-sm text-muted">{t('people.intro')}</p>
             {(error || loadError) && <p role="alert" className={ERROR}>{error || loadError}</p>}
             {form && (
                 <form ref={formRef} onSubmit={save} className="grid gap-2 sm:grid-cols-2">
-                    <label className="text-sm text-slate-400">{t('people.name')}
+                    <label className="text-sm text-muted">{t('people.name')}
                         <input className={INPUT} value={form.name} required maxLength={50} onChange={e => setForm({ ...form, name: e.target.value })} />
                     </label>
-                    <div className="text-sm text-slate-400">
+                    <div className="text-sm text-muted">
                         <label>{t('people.email')}
                             <input className={INPUT} type="email" value={form.email} maxLength={254} aria-describedby={newEmail ? 'email-hint' : undefined}
                                 onChange={e => setForm({ ...form, email: e.target.value })} />
                         </label>
                         {newEmail && <p id="email-hint" className="mt-1 text-xs">{t(config?.mails === false ? 'people.emailHintNoMail' : 'people.emailHint')}</p>}
                     </div>
-                    <label className="text-sm text-slate-400">{t('people.role')}
+                    <label className="text-sm text-muted">{t('people.role')}
                         <select className={INPUT} value={form.role} onChange={e => setForm({ ...form, role: e.target.value as Role })}>
                             <option value="PARENT">{t('people.roles.PARENT')}</option>
                             <option value="CHILD">{t('people.roles.CHILD')}</option>
                         </select>
                     </label>
-                    <label className="text-sm text-slate-400">{t('people.language')}
+                    <label className="text-sm text-muted">{t('people.language')}
                         <select className={INPUT} value={form.language} onChange={e => setForm({ ...form, language: e.target.value as Language | '' })}>
                             <option value="">{t('people.languageDefault', { language: t(`languages.${config?.default_language ?? 'de'}`) })}</option>
                             <option value="de">{t('languages.de')}</option>
                             <option value="en">{t('languages.en')}</option>
                         </select>
                     </label>
-                    <label className="text-sm text-slate-400">{t('people.color')}
+                    <label className="text-sm text-muted">{t('people.color')}
                         <input className={`${INPUT} h-10`} type="color" value={form.color} onChange={e => setForm({ ...form, color: e.target.value })} />
                     </label>
                     {emailChanged && (
-                        <div className="text-sm text-slate-400">
+                        <div className="text-sm text-muted">
                             <label htmlFor="person-current-pin">{t('people.currentPinForEmail')}</label>
                             <PinInput id="person-current-pin" value={form.currentPin} onChange={currentPin => setForm({ ...form, currentPin })} autoComplete="current-password" />
                         </div>
                     )}
-                    {!editingSelf && <div className="text-sm text-slate-400">
+                    {!editingSelf && <div className="text-sm text-muted">
                         <label htmlFor="person-pin">{form.id === null ? t('people.pin') : t('people.newPinOptional')}</label>
                         <PinInput id="person-pin" value={form.pin} onChange={pin => setForm({ ...form, pin })} autoComplete="new-password" />
                     </div>}
                     {form.id !== null && (
                         <div className="self-end text-sm">
-                            <label className="flex items-center gap-2 text-slate-300">
+                            <label className="flex items-center gap-2 text-ink">
                                 <input type="checkbox" checked={form.active} aria-describedby="active-hint"
                                     onChange={e => setForm({ ...form, active: e.target.checked })} />
                                 {t('people.active')}
                             </label>
-                            <p id="active-hint" className="mt-1 text-xs text-slate-400">{t('people.activeHint')}</p>
+                            <p id="active-hint" className="mt-1 text-xs text-muted">{t('people.activeHint')}</p>
                         </div>
                     )}
                     <div className="flex gap-2 sm:col-span-2">
                         <button type="submit" className={BUTTON} disabled={form.id === null && form.pin.length !== 4}>{t('people.save')}</button>
-                        <button type="button" className="px-3 text-slate-400 hover:text-white" onClick={() => setForm(null)}>{t('common.cancel')}</button>
+                        <button type="button" className="px-3 text-muted hover:text-ink" onClick={() => setForm(null)}>{t('common.cancel')}</button>
                     </div>
                 </form>
             )}
-            <ul className="divide-y divide-white/5">
+            <ul className="divide-y divide-line">
                 {people.map(p => (
                     <li key={p.id} className="flex flex-wrap items-center gap-2 py-2">
-                        <span aria-hidden="true" className="h-3 w-3 rounded-full" style={{ background: p.color ?? '#64748b' }} />
-                        <span className={`min-w-0 break-words font-medium ${p.active ? '' : 'text-slate-400 line-through'}`}>{p.name}</span>
-                        {!p.active && <span className="rounded border border-slate-500 px-1.5 text-xs text-slate-300">{t('people.inactive')}</span>}
-                        <span className="text-sm text-slate-400">{t(`people.roles.${p.role}`)}</span>
-                        {p.email && <span className="min-w-0 break-all text-sm text-slate-400">{p.email}</span>}
+                        <span aria-hidden="true" className="h-3 w-3 rounded-full" style={{ background: p.color ?? DEFAULT_PERSON_COLOR }} />
+                        <span className={`min-w-0 break-words font-medium ${p.active ? '' : 'text-muted line-through'}`}>{p.name}</span>
+                        {!p.active && <span className="rounded border border-line-strong px-1.5 text-xs text-ink">{t('people.inactive')}</span>}
+                        <span className="text-sm text-muted">{t(`people.roles.${p.role}`)}</span>
+                        {p.email && <span className="min-w-0 break-all text-sm text-muted">{p.email}</span>}
                         {p.email_pending && (
-                            <span className="min-w-0 break-all text-sm text-amber-300">{t('people.pendingEmail', { email: p.email_pending })}</span>
+                            <span className="min-w-0 break-all text-sm text-warning">{t('people.pendingEmail', { email: p.email_pending })}</span>
                         )}
                         {p.can_edit ? (
                             <span className="ml-auto flex gap-1">
                                 {!p.active && (
-                                    <button type="button" className={`${TOUCH} text-sm text-red-300 hover:underline`}
+                                    <button type="button" className={`${TOUCH} text-sm text-danger hover:underline`}
                                         onClick={() => remove(p)}
                                         aria-label={t('people.deleteOf', { name: p.name })}>{t('common.delete')}</button>
                                 )}
                                 {/* One form at a time: another "Edit" would throw away what is typed in the open one */}
-                                <button type="button" className={`${TOUCH} text-sm text-blue-300 hover:underline disabled:opacity-30 disabled:no-underline`}
+                                <button type="button" className={`${TOUCH} text-sm text-accent hover:underline disabled:opacity-30 disabled:no-underline`}
                                     disabled={form !== null} onClick={() => edit(p)}
                                     aria-label={t('people.editOf', { name: p.name })}>{t('common.edit')}</button>
                             </span>
                         ) : (
-                            <span className="ml-auto text-sm text-slate-400">{t('people.ownDetails')}</span>
+                            <span className="ml-auto text-sm text-muted">{t('people.ownDetails')}</span>
                         )}
                     </li>
                 ))}

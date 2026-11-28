@@ -6,6 +6,7 @@ const en: typeof de = {
     common: { cancel: 'Cancel', edit: 'Edit', delete: 'Delete', loading: 'Loading …' },
     unreachable: "The family hub can't be reached right now (it may be restarting). Trying again …",
     languages: { de: 'Deutsch', en: 'English' },
+    themes: { aurora: 'Aurora' },
     nav: { start: 'Start', settings: 'Settings', logout: 'Log out' },
     login: {
         tab: 'Log in',
@@ -37,6 +38,7 @@ const en: typeof de = {
         none: 'No apps yet. Parents add them in the settings.',
     },
     settings: {
+        theme: 'Theme',
         myPin: 'My PIN',
         oldPin: 'Current PIN',
         newPin: 'New PIN',

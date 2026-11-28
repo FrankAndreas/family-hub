@@ -43,6 +43,8 @@ class Person(Base):
     color: Mapped[str | None] = mapped_column(String(7))
     # None: the default language (DEFAULT_LANGUAGE)
     language: Mapped[str | None] = mapped_column(String(2))
+    # None: the default theme (config.DEFAULT_THEME); picked by the person themselves, like the language
+    theme: Mapped[str | None] = mapped_column(String(20))
     failed_logins: Mapped[int] = mapped_column(default=0)
     locked_until: Mapped[datetime | None]
     # Locks in a row: each one doubles the next (see pins.lock_duration); a correct login or a new PIN resets it
@@ -55,6 +57,11 @@ class Person(Base):
     def language_or_default(self) -> str:
         """The person's language, or DEFAULT_LANGUAGE if they haven't picked one."""
         return self.language or config.default_language()
+
+    @property
+    def theme_or_default(self) -> str:
+        """The person's theme, or the default if they haven't picked one (or it is no longer known)."""
+        return self.theme if self.theme in config.THEMES else config.DEFAULT_THEME
 
     @staticmethod
     def by_name(db: Session, name: str) -> "Person | None":

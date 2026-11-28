@@ -40,7 +40,7 @@ export default function PinInput({
                 type="button"
                 onClick={() => setShow(!show)}
                 aria-label={show ? t('login.hidePin') : t('login.showPin')}
-                className="absolute inset-y-0 right-0 px-3 text-slate-400 hover:text-white"
+                className="absolute inset-y-0 right-0 px-3 text-muted hover:text-ink"
             >
                 {show ? '🙈' : '👁️'}
             </button>

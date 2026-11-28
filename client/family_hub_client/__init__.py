@@ -48,6 +48,8 @@ class HubPerson:
     # Only when the app's tile in the hub shares them: the confirmed address, or None
     email: Optional[str] = None
     email_shared: bool = False
+    # The person's theme (family-hub-theme); "aurora" from a hub that doesn't send one yet
+    theme: str = "aurora"
 
 
 class HubUnavailable(Exception):
@@ -94,6 +96,7 @@ def _person(data: dict) -> HubPerson:
         language=str(data.get("language") or "de"),
         email=str(data["email"]).strip().casefold() if data.get("email") else None,
         email_shared="email" in data,
+        theme=str(data.get("theme") or "aurora"),
     )
 
 

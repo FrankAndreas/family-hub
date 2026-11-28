@@ -22,6 +22,19 @@ jobs:
       # The tests run the API in-process against a temporary SQLite database (see tests/conftest.py)
       - run: pytest
 
+  theme:
+    name: Theme package contents
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      # Exactly the files the apps need (theme/README.md): a missing one breaks every app's build after an update
+      - run: |
+          cd theme
+          npm pack --dry-run --json | node -e "
+            const files = JSON.parse(require('fs').readFileSync(0, 'utf8'))[0].files.map(f => f.path).sort();
+            const want = ['README.md', 'index.d.ts', 'index.js', 'package.json', 'theme-init.js', 'theme.css'];
+            if (JSON.stringify(files) !== JSON.stringify(want)) { console.error('theme package files:', files); process.exit(1); }"
+
   frontend:
     name: Frontend lint, type-check and build
     runs-on: ubuntu-latest

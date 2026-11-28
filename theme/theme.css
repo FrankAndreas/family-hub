@@ -1,0 +1,119 @@
+/* family-hub-theme: the family apps' look by role. Components use only these roles (bg-surface, text-muted, rounded-card,
+   ...); a theme is one set of values. Import after Tailwind: @import "tailwindcss"; @import "family-hub-theme/theme.css";
+   Roles: docs/superpowers/specs/2026-11-28-themes-design.md in family-hub. */
+
+/* The roles as Tailwind utilities; the values live in the themes below (inline: utilities read the variables) */
+@theme inline {
+  --color-page: var(--fh-page);
+  --color-surface: var(--fh-surface);
+  --color-surface-strong: var(--fh-surface-strong);
+  --color-field: var(--fh-field);
+  --color-line: var(--fh-line);
+  --color-line-strong: var(--fh-line-strong);
+  --color-ink: var(--fh-ink);
+  --color-muted: var(--fh-muted);
+  --color-accent: var(--fh-accent);
+  --color-accent-2: var(--fh-accent-2);
+  --color-accent-3: var(--fh-accent-3);
+  --color-success: var(--fh-success);
+  --color-danger: var(--fh-danger);
+  --color-warning: var(--fh-warning);
+  --color-on-accent: var(--fh-on-accent);
+  --color-hover: var(--fh-hover);
+  --color-pressed: var(--fh-pressed);
+  --color-button-from: var(--fh-button-from);
+  --color-button-to: var(--fh-button-to);
+  --radius-card: var(--fh-radius-card);
+  --radius-control: var(--fh-radius-control);
+  --shadow-card: var(--fh-shadow-card);
+  --blur-glass: var(--fh-blur-glass);
+  --font-sans: var(--fh-font-sans);
+}
+
+/* Aurora: dark slate, frosted glass, neon accents (the default, also before a theme is applied) */
+:root,
+[data-theme='aurora'] {
+  color-scheme: dark;
+  --fh-page: #0f172a;
+  --fh-page-glow:
+    radial-gradient(at 0% 0%, rgba(129, 140, 248, 0.15) 0px, transparent 50%),
+    radial-gradient(at 100% 0%, rgba(232, 121, 249, 0.15) 0px, transparent 50%);
+  --fh-surface: rgba(30, 41, 59, 0.4);
+  --fh-surface-strong: rgba(15, 23, 42, 0.6);
+  --fh-field: rgba(15, 23, 42, 0.6);
+  --fh-line: rgba(255, 255, 255, 0.1);
+  /* slate-500: a field's outline reaches 3:1 on the cards (WCAG for controls) */
+  --fh-line-strong: #64748b;
+  --fh-ink: #f1f5f9;
+  --fh-muted: #94a3b8;
+  --fh-accent: #22d3ee;
+  --fh-accent-2: #e879f9;
+  --fh-accent-3: #818cf8;
+  --fh-success: #6ee7b7;
+  --fh-danger: #fca5a5;
+  --fh-warning: #fcd34d;
+  --fh-on-accent: #ffffff;
+  --fh-hover: rgba(255, 255, 255, 0.05);
+  --fh-pressed: rgba(255, 255, 255, 0.1);
+  /* indigo-600 → fuchsia-700: white text reaches 6.3:1 at both ends (WCAG asks 4.5) */
+  --fh-button-from: #4f46e5;
+  --fh-button-to: #a21caf;
+  --fh-radius-card: 16px;
+  --fh-radius-control: 8px;
+  --fh-shadow-card: 0 8px 32px 0 rgba(31, 38, 135, 0.37);
+  --fh-blur-glass: 12px;
+  --fh-font-sans: 'Inter', system-ui, Avenir, Helvetica, Arial, sans-serif;
+}
+
+/* In Tailwind's layers, so an app's utilities (hover:bg-hover, font-semibold, rounded-*) win over these */
+@layer base {
+  body {
+    margin: 0;
+    padding: 0;
+    font-family: var(--fh-font-sans);
+    background-color: var(--fh-page);
+    background-image: var(--fh-page-glow);
+    background-attachment: fixed;
+    color: var(--fh-ink);
+    min-height: 100vh;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  h1,
+  h2,
+  h3 {
+    letter-spacing: -0.025em;
+    font-weight: 700;
+  }
+}
+
+@layer components {
+  .glass-card {
+    background: var(--fh-surface);
+    backdrop-filter: blur(var(--fh-blur-glass));
+    -webkit-backdrop-filter: blur(var(--fh-blur-glass));
+    border: 1px solid var(--fh-line);
+    box-shadow: var(--fh-shadow-card);
+    border-radius: var(--fh-radius-card);
+  }
+
+  .btn-primary {
+    background: linear-gradient(135deg, var(--fh-button-from), var(--fh-button-to));
+    border: none;
+    border-radius: var(--fh-radius-control);
+    color: var(--fh-on-accent);
+    padding: 0.6em 1.2em;
+    font-weight: 600;
+    cursor: pointer;
+    transition: opacity 0.2s;
+  }
+
+  .btn-primary:hover {
+    opacity: 0.9;
+  }
+
+  .btn-primary:disabled {
+    opacity: 0.5;
+    cursor: default;
+  }
+}
