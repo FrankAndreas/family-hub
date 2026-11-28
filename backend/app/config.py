@@ -14,6 +14,10 @@ from pydantic import BaseModel, ConfigDict, field_validator
 logger = logging.getLogger(__name__)
 
 Language = Literal["de", "en"]
+# The apps' looks (family-hub-theme); a person without a choice gets the default
+Theme = Literal["aurora"]
+THEMES: tuple[str, ...] = ("aurora",)
+DEFAULT_THEME = "aurora"
 # https, or plain http only for a development server on this machine (as an app's address on a tile)
 _PUBLIC_URL = re.compile(r"^(https://[^\s/]+|http://(localhost|127\.0\.0\.1)(:\d+)?)(/\S*)?$")
 

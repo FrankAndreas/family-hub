@@ -4,7 +4,7 @@ from typing import Annotated
 from pydantic import AfterValidator, AliasChoices, BaseModel, ConfigDict, Field, field_serializer, field_validator
 
 from . import models
-from .config import Language
+from .config import Language, Theme
 from .models import Role
 
 PIN = r"^\d{4}$"
@@ -39,6 +39,7 @@ class PersonOut(BaseModel):
     language: str
     # Whether the person picked the language themselves (else the default)
     language_chosen: bool
+    theme: str
     # Managing people, PINs and apps happens at home only: the settings page shows it outside
     at_home: bool = True
     # Whether the parent asking may change this person: themselves and the children, never another parent
@@ -58,6 +59,7 @@ class PersonOut(BaseModel):
             color=person.color,
             language=person.language_or_default,
             language_chosen=person.language is not None,
+            theme=person.theme_or_default,
         )
 
 
@@ -75,6 +77,7 @@ class AppPerson(BaseModel):
     color: str | None
     # The person's choice or the default; read from a Person, or from this model's own output
     language: str = Field(validation_alias=AliasChoices("language_or_default", "language"))
+    theme: str = Field(validation_alias=AliasChoices("theme_or_default", "theme"))
     email: str | None = None
 
 
@@ -142,6 +145,7 @@ class OwnPinIn(BaseModel):
 
 class MePatch(BaseModel):
     language: Language | None = None
+    theme: Theme | None = None
     color: str | None = Field(default=None, pattern=COLOR)
 
 

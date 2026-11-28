@@ -68,7 +68,7 @@ def change_me(
     person: models.Person = Depends(auth.current_person),
     db: Session = Depends(get_db),
 ):
-    # Outside, the Cloudflare login is enough for one's own language and colour; at home it takes the manage cookie
+    # Outside, the Cloudflare login is enough for one's own language, colour and theme; at home, the manage cookie
     if not auth.through_tunnel(request):
         auth.require_manager(request, person, db)
     fields = body.model_fields_set
@@ -76,6 +76,8 @@ def change_me(
         person.language = body.language
     if "color" in fields:
         person.color = body.color
+    if "theme" in fields:
+        person.theme = body.theme
     db.commit()
     return schemas.PersonOut.of(person, not auth.through_tunnel(request))
 
