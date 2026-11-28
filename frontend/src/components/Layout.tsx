@@ -8,7 +8,7 @@ import { logoutAddress } from '../next';
 
 // The page one is on stands out (NavLink also sets aria-current="page")
 const navClass = ({ isActive }: { isActive: boolean }) =>
-    `${TOUCH} ${isActive ? 'font-semibold text-ink underline decoration-accent decoration-2 underline-offset-8' : 'text-ink hover:text-ink'}`;
+    `${TOUCH} ${isActive ? 'font-semibold text-ink underline decoration-accent decoration-2 underline-offset-8' : 'text-muted hover:text-ink'}`;
 
 // The frame of every page once logged in: the family's name, Start, Settings, and logging out
 export default function Layout({ children }: { children: ReactNode }) {

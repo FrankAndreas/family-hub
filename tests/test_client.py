@@ -182,6 +182,10 @@ def test_the_fake_tells_the_app_what_changed():
     assert hub.session(lena).person.role == "CHILD"
     fake.set_role("Lena", "PARENT")
     assert hub.session(lena).person.role == "PARENT" and forgotten
+    fake.set_language("Lena", "en")
+    assert hub.session(lena).person.language == "en"
+    fake.set_theme("Lena", "daely")
+    assert hub.session(lena).person.theme == "daely"
     fake.rename("Lena", "Lea")
     assert hub.session(Login(fake_token("Lea"))).person.name == "Lea"
     fake.down = True

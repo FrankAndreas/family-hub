@@ -50,7 +50,8 @@ export default defineConfig({
         },
         {
             // Vite forwards /api to the test backend, so the login cookie is the page's own (as with nginx)
-            command: 'npx vite --port 3110 --strictPort',
+            // theme:copy as predev does: the page loads /theme-init.js first
+            command: 'npm run theme:copy && npx vite --port 3110 --strictPort',
             cwd: path.resolve(__dirname, '..', 'frontend'),
             url: FRONTEND,
             env: { API_PROXY: BACKEND },

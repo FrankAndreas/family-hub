@@ -65,50 +65,55 @@
   --fh-font-sans: 'Inter', system-ui, Avenir, Helvetica, Arial, sans-serif;
 }
 
-body {
-  margin: 0;
-  padding: 0;
-  font-family: var(--fh-font-sans);
-  background-color: var(--fh-page);
-  background-image: var(--fh-page-glow);
-  background-attachment: fixed;
-  color: var(--fh-ink);
-  min-height: 100vh;
-  -webkit-font-smoothing: antialiased;
+/* In Tailwind's layers, so an app's utilities (hover:bg-hover, font-semibold, rounded-*) win over these */
+@layer base {
+  body {
+    margin: 0;
+    padding: 0;
+    font-family: var(--fh-font-sans);
+    background-color: var(--fh-page);
+    background-image: var(--fh-page-glow);
+    background-attachment: fixed;
+    color: var(--fh-ink);
+    min-height: 100vh;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  h1,
+  h2,
+  h3 {
+    letter-spacing: -0.025em;
+    font-weight: 700;
+  }
 }
 
-.glass-card {
-  background: var(--fh-surface);
-  backdrop-filter: blur(var(--fh-blur-glass));
-  -webkit-backdrop-filter: blur(var(--fh-blur-glass));
-  border: 1px solid var(--fh-line);
-  box-shadow: var(--fh-shadow-card);
-  border-radius: var(--fh-radius-card);
-}
+@layer components {
+  .glass-card {
+    background: var(--fh-surface);
+    backdrop-filter: blur(var(--fh-blur-glass));
+    -webkit-backdrop-filter: blur(var(--fh-blur-glass));
+    border: 1px solid var(--fh-line);
+    box-shadow: var(--fh-shadow-card);
+    border-radius: var(--fh-radius-card);
+  }
 
-.btn-primary {
-  background: linear-gradient(135deg, var(--fh-button-from), var(--fh-button-to));
-  border: none;
-  border-radius: var(--fh-radius-control);
-  color: var(--fh-on-accent);
-  padding: 0.6em 1.2em;
-  font-weight: 600;
-  cursor: pointer;
-  transition: opacity 0.2s;
-}
+  .btn-primary {
+    background: linear-gradient(135deg, var(--fh-button-from), var(--fh-button-to));
+    border: none;
+    border-radius: var(--fh-radius-control);
+    color: var(--fh-on-accent);
+    padding: 0.6em 1.2em;
+    font-weight: 600;
+    cursor: pointer;
+    transition: opacity 0.2s;
+  }
 
-.btn-primary:hover {
-  opacity: 0.9;
-}
+  .btn-primary:hover {
+    opacity: 0.9;
+  }
 
-.btn-primary:disabled {
-  opacity: 0.5;
-  cursor: default;
-}
-
-h1,
-h2,
-h3 {
-  letter-spacing: -0.025em;
-  font-weight: 700;
+  .btn-primary:disabled {
+    opacity: 0.5;
+    cursor: default;
+  }
 }

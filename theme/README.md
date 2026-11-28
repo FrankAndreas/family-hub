@@ -18,7 +18,7 @@ The apps' images have no git and npm can't install a folder of a GitHub archive,
 - CSS entry: `@import "tailwindcss"; @import "family-hub-theme/theme.css";` (sets `body`, `.glass-card`,
   `.btn-primary` and the role utilities).
 - `index.html`, first in `<head>`: `<script src="/theme-init.js"></script>`, with
-  `"theme:copy": "node -e \"require('fs').copyFileSync('node_modules/family-hub-theme/theme-init.js','public/theme-init.js')\""`
+  `"theme:copy": "node -e \"const fs=require('fs');fs.mkdirSync('public',{recursive:true});fs.copyFileSync('node_modules/family-hub-theme/theme-init.js','public/theme-init.js')\""`
   run by `predev` and `prebuild` (and `public/theme-init.js` in `.gitignore`). It shows the remembered theme before the
   page renders; a file, since the apps' Content-Security-Policy allows no inline scripts.
 - When the app learns who is logged in: `applyTheme(me.theme)`; on logout or without a login: `applyTheme(null)`.

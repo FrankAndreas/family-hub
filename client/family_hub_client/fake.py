@@ -91,6 +91,7 @@ class FakeHub:
 
     def set_language(self, name: str, language: str) -> None:
         self.people[name] = replace(self.people[name], language=language)
+        self._changed()
 
     def set_theme(self, name: str, theme: str) -> None:
         self.people[name] = replace(self.people[name], theme=theme)
